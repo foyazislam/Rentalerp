@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mobile ERP — Single-File HTML</title>
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React 18 (UMD) + ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for in-browser JSX transform (fine for small apps) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      html, body { height: 100%; background: #f1f5f9; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useEffect, useMemo, useRef, useState } = React;
+
+      /* ------------- Utilities ------------- */
+      const STORAGE_KEY = "rental_erp_v1";
+      const todayStr = () => new Date().toISOString().slice(0, 10);
+
+      const currency = (n) => {
+        const num = Number(n || 0);
+        try {
+          return num
+            .toLocaleString(undefined, { style: "currency", currency: "BDT" })
+            .replace("BDT", "৳")
+            .trim();
+        } catch {
+          return `৳${num.toLocaleString()}`;
+        }
+      };
+
+      const monthKey = (dateStr) => {
+        const d = new Date(dateStr);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; // YYYY-MM
+      };
+
+      const nextReceiptNo = (allPayments) => {
+        const yyyymm = monthKey(new Date().toISOString());
+        const prefix = `RC-${yyyymm}-`;
+        const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1;
+        return `${prefix}${String(count).padStart(4, "0")}`;
+      };
+
+      const download = (filename, text) => {
+        const blob = new Blob([text], { type: "application/json;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      };
+
+      const classNames = (...c) => c.filter(Boolean).join(" ");
+
+      // crypto.randomUUID fallback for older Safari if needed
+      if (!(window.crypto && window.crypto.randomUUID)) {
+        window.crypto = window.crypto || {};
+        window.crypto.randomUUID = function () {
+          // RFC4122 v4-ish
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
+        };
+      }
+
+      /* ------------- Demo initial data ------------- */
+      const initialData = {
+        org: {
+          name: "Foyaz Properties",
+          address: "123 Example Road, Dhaka",
+          phone: "+8801XXXXXXXXX",
+          email: "owner@example.com",
+          note: "Thank you for your payment!",
+        },
+        units: [
+          ...Array.from({ length: 10 }).map((_, i) => ({
+            id: `F${i + 1}`,
+            type: "Flat",
+            name: `Flat ${i + 1}`,
+            floor: Math.ceil((i + 1) / 2),
+            rent: 15000,
+            dueDay: 5,
+            tenant: "",
+          })),
+          ...Array.from({ length: 5 }).map((_, i) => ({
+            id: `S${i + 1}`,
+            type: "Shop",
+            name: `Shop ${i + 1}`,
+            floor: 0,
+            rent: 25000,
+            dueDay: 5,
+            tenant: "",
+          })),
+        ],
+        payments: [], // {id, unitId, tenant, amount, forMonth, date, method, notes, receiptNo}
+        expenses: [], // {id, date, category, vendor, amount, notes}
+      };
+
+      const loadData = () => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return initialData;
+          const parsed = JSON.parse(raw);
+          return { ...initialData, ...parsed };
+        } catch (e) {
+          console.error("Load error", e);
+          return initialData;
+        }
+      };
+
+      const saveData = (data) => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      };
+
+      /* ------------- Small UI primitives ------------- */
+      const Section = ({ title, right, children }) => (
+        <div className="bg-white rounded-2xl shadow p-4 md:p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg md:text-xl font-semibold">{title}</h2>
+            {right}
+          </div>
+          {children}
+        </div>
+      );
+
+      const Input = (props) => (
+        <input
+          {...props}
+          className={classNames(
+            "w-full rounded-xl border px-3 py-2 text-sm md:text-base",
+            "focus:outline-none focus:ring-2 focus:ring-indigo-400",
+            props.className
+          )}
+        />
+      );
+
+      const Select = (props) => (
+        <select
+          {...props}
+          className={classNames(
+            "w-full rounded-xl border px-3 py-2 text-sm md:text-base",
+            "focus:outline-none focus:ring-2 focus:ring-indigo-400",
+            props.className
+          )}
+        />
+      );
+
+      const Button = ({ children, variant = "primary", className, ...rest }) => {
+        const styles = {
+          primary: "bg-indigo-600 text-white hover:bg-indigo-700",
+          secondary: "bg-slate-100 hover:bg-slate-200",
+          danger: "bg-rose-600 text-white hover:bg-rose-700",
+          ghost: "bg-transparent hover:bg-slate-100",
+        };
+        return (
+          <button
+            {...rest}
+            className={classNames(
+              "rounded-xl px-4 py-2 text-sm md:text-base transition shadow-sm",
+              styles[variant],
+              className
+            )}
+          >
+            {children}
+          </button>
+        );
+      };
+
+      /* ------------- Main App ------------- */
+      function App() {
+        const [data, setData] = useState(loadData());
+        const [tab, setTab] = useState("dashboard");
+        const [search, setSearch] = useState("");
+        const [showReceipt, setShowReceipt] = useState(null); // payment object
+
+        useEffect(() => saveData(data), [data]);
+
+        const units = data.units;
+        const payments = data.payments;
+        const expenses = data.expenses;
+
+        const totals = useMemo(() => {
+          const income = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+          const expense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+          return { income, expense, net: income - expense };
+        }, [payments, expenses]);
+
+        const outstandingByUnit = useMemo(() => {
+          const now = new Date();
+          const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          const map = Object.fromEntries(units.map((u) => [u.id, u.rent || 0]));
+          payments
+            .filter((p) => (p.forMonth || "").startsWith(ym))
+            .forEach((p) => {
+              map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0);
+            });
+          return map; // positive means due
+        }, [units, payments]);
+
+        const filteredUnits = useMemo(() => {
+          if (!search) return units;
+          const q = search.toLowerCase();
+          return units.filter(
+            (u) =>
+              u.id.toLowerCase().includes(q) ||
+              u.name.toLowerCase().includes(q) ||
+              (u.tenant || "").toLowerCase().includes(q) ||
+              (u.type || "").toLowerCase().includes(q)
+          );
+        }, [units, search]);
+
+        // Data helpers
+        const updateOrg = (patch) => setData((d) => ({ ...d, org: { ...d.org, ...patch } }));
+        const upsertUnit = (unit) =>
+          setData((d) => ({
+            ...d,
+            units: d.units.some((x) => x.id === unit.id)
+              ? d.units.map((x) => (x.id === unit.id ? { ...x, ...unit } : x))
+              : [...d.units, unit],
+          }));
+
+        const deleteUnit = (id) => setData((d) => ({ ...d, units: d.units.filter((u) => u.id !== id) }));
+        const addPayment = (p) =>
+          setData((d) => ({ ...d, payments: [{ ...p, id: crypto.randomUUID() }, ...d.payments] }));
+        const addExpense = (e) =>
+          setData((d) => ({ ...d, expenses: [{ ...e, id: crypto.randomUUID() }, ...d.expenses] }));
+
+        const exportData = () => download(`rental-erp-backup-${todayStr()}.json`, JSON.stringify(data, null, 2));
+        const importData = (file) => {
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            try {
+              const parsed = JSON.parse(evt.target.result);
+              setData(parsed);
+              alert("Import successful ✅");
+            } catch (e) {
+              alert("Import failed: invalid JSON");
+            }
+          };
+          reader.readAsText(file);
+        };
+
+        // Reset / data management actions for Settings
+        const clearOrgFields = () =>
+          setData((d) => ({ ...d, org: { name: "", address: "", phone: "", email: "", note: "" } }));
+
+        const restoreDemoOrg = () =>
+          setData((d) => ({ ...d, org: { ...initialData.org } }));
+
+        const clearPayments = () =>
+          setData((d) => ({ ...d, payments: [] }));
+
+        const clearExpenses = () =>
+          setData((d) => ({ ...d, expenses: [] }));
+
+        const factoryReset = () => {
+          setData({ ...initialData });
+        };
+
+        return (
+          <div className="min-h-screen bg-slate-50 text-slate-800">
+            <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
+              <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-2">
+                <div className="text-xl md:text-2xl font-bold">🏢 {data.org.name}</div>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button variant="secondary" onClick={exportData}>⤓ Export</Button>
+                  <label className="cursor-pointer">
+                    <span className="inline-block bg-slate-100 hover:bg-slate-200 rounded-xl px-4 py-2 text-sm">Import</span>
+                    <input className="hidden" type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} />
+                  </label>
+                </div>
+              </div>
+              <nav className="mx-auto max-w-6xl px-2 pb-3">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+                  {[
+                    ["dashboard", "Dashboard"],
+                    ["units", "Units"],
+                    ["payments", "Payments"],
+                    ["newReceipt", "New Receipt"],
+                    ["expenses", "Expenses"],
+                    ["settings", "Settings"],
+                  ].map(([key, label]) => (
+                    <Button
+                      key={key}
+                      variant={tab === key ? "primary" : "secondary"}
+                      className="w-full"
+                      onClick={() => setTab(key)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </nav>
+            </header>
+
+            <main className="mx-auto max-w-6xl p-4 space-y-4 md:space-y-6">
+              {tab === "dashboard" && (
+                <DashboardSection totals={totals} units={units} outstandingByUnit={outstandingByUnit} setTab={setTab} />
+              )}
+
+              {tab === "units" && (
+                <Section
+                  title="Units (Flats & Shops)"
+                  right={<Input placeholder="Search units/tenant…" value={search} onChange={(e) => setSearch(e.target.value)} />}
+                >
+                  <UnitsTable units={filteredUnits} upsertUnit={upsertUnit} deleteUnit={deleteUnit} />
+                </Section>
+              )}
+
+              {tab === "payments" && (
+                <Section title="Payments (tap a row for receipt)">
+                  <PaymentsTable payments={payments} units={units} onRowClick={setShowReceipt} />
+                </Section>
+              )}
+
+              {tab === "newReceipt" && (
+                <Section title="Create Money Receipt">
+                  <NewReceiptForm units={units} addPayment={addPayment} data={data} />
+                </Section>
+              )}
+
+              {tab === "expenses" && (
+                <Section title="Expenses">
+                  <ExpensesSection expenses={expenses} addExpense={addExpense} />
+                </Section>
+              )}
+
+              {tab === "settings" && (
+                <Section title="Organization Settings">
+                  <OrgSettings
+                    org={data.org}
+                    updateOrg={updateOrg}
+                    clearOrgFields={clearOrgFields}
+                    restoreDemoOrg={restoreDemoOrg}
+                    clearPayments={() => { if (confirm("Clear ALL payments? This will remove every receipt.")) clearPayments(); }}
+                    clearExpenses={() => { if (confirm("Clear ALL expenses?")) clearExpenses(); }}
+                    factoryReset={() => { if (confirm("Factory Reset EVERYTHING? Units, payments, expenses and org will reset to demo.")) factoryReset(); }}
+                  />
+                </Section>
+              )}
+            </main>
+
+            {showReceipt && (
+              <ReceiptModal
+                org={data.org}
+                payment={showReceipt}
+                unit={units.find((u) => u.id === showReceipt.unitId)}
+                onClose={() => setShowReceipt(null)}
+              />
+            )}
+          </div>
+        );
+      }
+
+      /* ------------- Dashboard ------------- */
+      function DashboardSection({ totals, units, outstandingByUnit, setTab }) {
+        const totalDue = Object.values(outstandingByUnit).reduce((s, v) => s + Math.max(0, v), 0);
+
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <StatCard label="Income" value={currency(totals.income)} />
+            <StatCard label="Expenses" value={currency(totals.expense)} />
+            <StatCard label="Net" value={currency(totals.net)} />
+            <StatCard label="This Month Due" value={currency(totalDue)} />
+
+            <div className="col-span-2 md:col-span-4">
+              <Section title="Quick Actions" right={<div />}> 
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <Button className="w-full" onClick={() => setTab("newReceipt")}>New Receipt</Button>
+                  <Button variant="secondary" className="w-full" onClick={() => setTab("payments")}>View Payments</Button>
+                  <Button variant="secondary" className="w-full" onClick={() => setTab("units")}>Manage Units</Button>
+                  <Button variant="secondary" className="w-full" onClick={() => setTab("expenses")}>Add Expense</Button>
+                </div>
+              </Section>
+            </div>
+
+            <div className="col-span-2 md:col-span-4">
+              <Section title="Current Month Dues by Unit">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {units.map((u) => (
+                    <div key={u.id} className="flex items-center justify-between rounded-xl border p-3">
+                      <div>
+                        <div className="font-medium">{u.name} <span className="text-xs text-slate-500">({u.type})</span></div>
+                        <div className="text-xs text-slate-500">Tenant: {u.tenant || "—"}</div>
+                      </div>
+                      <div className={classNames("text-right font-semibold", (outstandingByUnit[u.id] || 0) > 0 ? "text-rose-600" : "text-emerald-600")}>{currency(Math.max(0, outstandingByUnit[u.id] || 0))}</div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            </div>
+          </div>
+        );
+      }
+
+      function StatCard({ label, value }) {
+        return (
+          <div className="bg-white rounded-2xl shadow p-4">
+            <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+            <div className="text-xl md:text-2xl font-semibold mt-1">{value}</div>
+          </div>
+        );
+      }
+
+      /* ------------- Units ------------- */
+      function UnitsTable({ units, upsertUnit, deleteUnit }) {
+        const [form, setForm] = useState({ type: "Flat", rent: 15000, dueDay: 5 });
+
+        const edit = (u) => setForm({ ...u });
+        const reset = () => setForm({ type: "Flat", rent: 15000, dueDay: 5 });
+
+        const submit = () => {
+          if (!form.id || !form.name) return alert("Please fill ID and Name");
+          upsertUnit({ ...form, rent: Number(form.rent || 0), dueDay: Number(form.dueDay || 1) });
+          reset();
+        };
+
+        return (
+          <div className="grid md:grid-cols-3 gap-3 md:gap-4">
+            <div className="md:col-span-1 bg-slate-50 border rounded-2xl p-3 space-y-2">
+              <div className="font-semibold">Add / Edit Unit</div>
+              <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input placeholder="Unit ID (e.g., F1)" value={form.id || ""} onChange={(e) => setForm({ ...form, id: e.target.value })} />
+                  <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                    <option>Flat</option>
+                    <option>Shop</option>
+                  </Select>
+                </div>
+                <Input placeholder="Name" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <Input type="number" placeholder="Floor" value={form.floor ?? ""} onChange={(e) => setForm({ ...form, floor: Number(e.target.value) })} />
+                <Input type="number" placeholder="Monthly Rent" value={form.rent ?? ""} onChange={(e) => setForm({ ...form, rent: e.target.value })} />
+                <Input type="number" placeholder="Due Day (1-28)" value={form.dueDay ?? ""} onChange={(e) => setForm({ ...form, dueDay: e.target.value })} />
+                <Input placeholder="Tenant Name" value={form.tenant || ""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Button onClick={submit}>Save</Button>
+                <Button variant="secondary" onClick={reset}>Clear</Button>
+              </div>
+            </div>
+
+            <div className="md:col-span-2 overflow-auto rounded-2xl border">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-100 text-slate-600">
+                  <tr>
+                    <th className="p-3 text-left">ID</th>
+                    <th className="p-3 text-left">Name</th>
+                    <th className="p-3">Type</th>
+                    <th className="p-3 text-right">Rent</th>
+                    <th className="p-3">Due Day</th>
+                    <th className="p-3">Tenant</th>
+                    <th className="p-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {units.map((u) => (
+                    <tr key={u.id} className="border-t">
+                      <td className="p-3">{u.id}</td>
+                      <td className="p-3">{u.name}</td>
+                      <td className="p-3 text-center">{u.type}</td>
+                      <td className="p-3 text-right">{currency(u.rent)}</td>
+                      <td className="p-3 text-center">{u.dueDay}</td>
+                      <td className="p-3">{u.tenant || "—"}</td>
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <Button variant="secondary" onClick={() => edit(u)}>Edit</Button>
+                          <Button variant="danger" onClick={() => deleteUnit(u.id)}>Delete</Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      }
+
+      /* ------------- Payments ------------- */
+      function PaymentsTable({ payments, units, onRowClick }) {
+        const [q, setQ] = useState("");
+        const [month, setMonth] = useState("");
+
+        const list = payments.filter((p) => {
+          const unit = units.find((u) => u.id === p.unitId);
+          const blob = `${p.receiptNo} ${p.tenant} ${unit?.name} ${unit?.id}`.toLowerCase();
+          const okQ = !q || blob.includes(q.toLowerCase());
+          const okM = !month || p.forMonth.startsWith(month);
+          return okQ && okM;
+        });
+
+        return (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-start">
+              <Input placeholder="Search receipt/tenant/unit…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+              <div className="md:col-span-3 flex gap-2">
+                <Button variant="secondary" onClick={() => { setQ(""); setMonth(""); }}>Reset Filters</Button>
+              </div>
+            </div>
+            <div className="overflow-auto rounded-2xl border">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-100 text-slate-600">
+                  <tr>
+                    <th className="p-3 text-left">Date</th>
+                    <th className="p-3">Receipt #</th>
+                    <th className="p-3">Unit</th>
+                    <th className="p-3 text-left">Tenant</th>
+                    <th className="p-3 text-right">Amount</th>
+                    <th className="p-3">For Month</th>
+                    <th className="p-3">Method</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((p) => {
+                    const unit = units.find((u) => u.id === p.unitId);
+                    return (
+                      <tr key={p.id} className="border-t hover:bg-indigo-50 cursor-pointer" onClick={() => onRowClick(p)}>
+                        <td className="p-3">{p.date}</td>
+                        <td className="p-3 text-center font-medium">{p.receiptNo}</td>
+                        <td className="p-3 text-center">{unit?.name || p.unitId}</td>
+                        <td className="p-3">{p.tenant}</td>
+                        <td className="p-3 text-right font-semibold">{currency(p.amount)}</td>
+                        <td className="p-3 text-center">{p.forMonth}</td>
+                        <td className="p-3 text-center">{p.method}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      }
+
+      /* ------------- FIXED: NewReceiptForm ------------- */
+      function NewReceiptForm({ units, addPayment, data }) {
+        const [form, setForm] = useState({ date: todayStr(), method: "Cash" });
+
+        // Generate first receipt no.
+        useEffect(() => {
+          if (!form.receiptNo) setForm((f) => ({ ...f, receiptNo: nextReceiptNo(data.payments) }));
+        }, []);
+
+        const unit = units.find((u) => u.id === form.unitId);
+
+        // 🔧 Prefill tenant from unit when unit changes, but don't overwrite typed value
+        useEffect(() => {
+          if (unit && !form.tenant && unit.tenant) {
+            setForm((f) => ({ ...f, tenant: unit.tenant }));
+          }
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [form.unitId]); // re-run when unit selection changes
+
+        const resetForm = () =>
+          setForm({ date: todayStr(), method: "Cash", receiptNo: nextReceiptNo(data.payments) });
+
+        const submit = () => {
+          const effectiveTenant = form.tenant ?? unit?.tenant ?? "";
+          if (!form.unitId || !effectiveTenant || !form.amount || !form.forMonth) {
+            return alert("Please fill Unit, Tenant, Amount and For Month.");
+          }
+          const payload = { ...form, tenant: effectiveTenant, amount: Number(form.amount || 0) };
+          addPayment(payload);
+          alert(`Receipt ${form.receiptNo} created ✅`);
+          setForm({
+            date: todayStr(),
+            method: form.method,
+            receiptNo: nextReceiptNo([...data.payments, payload]),
+          });
+        };
+
+        // Show either typed tenant or unit's tenant
+        const effectiveTenant = form.tenant ?? unit?.tenant ?? "";
+
+        return (
+          <div className="grid md:grid-cols-3 gap-3 md:gap-4">
+            <div className="md:col-span-2 bg-slate-50 border rounded-2xl p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Select
+                  value={form.unitId || ""}
+                  onChange={(e) => setForm({ ...form, unitId: e.target.value })}
+                >
+                  <option value="">Select Unit…</option>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                  ))}
+                </Select>
+                <Input
+                  placeholder="Tenant Name"
+                  value={effectiveTenant}
+                  onChange={(e) => setForm({ ...form, tenant: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="number"
+                  placeholder="Amount (৳)"
+                  value={form.amount ?? ""}
+                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                />
+                <Input
+                  type="month"
+                  placeholder="For Month"
+                  value={form.forMonth || ""}
+                  onChange={(e) => setForm({ ...form, forMonth: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => setForm({ ...form, date: e.target.value })}
+                />
+                <Select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
+                  <option>Cash</option>
+                  <option>Bank</option>
+                  <option>Bkash</option>
+                  <option>Nagad</option>
+                  <option>Card</option>
+                </Select>
+              </div>
+              <Input
+                placeholder="Notes (optional)"
+                value={form.notes || ""}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              />
+              <div className="text-xs text-slate-500">
+                Auto Receipt #: <span className="font-medium text-slate-700">{form.receiptNo || "(will generate)"}</span>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={submit}>Save Receipt</Button>
+                <Button variant="secondary" onClick={resetForm}>Reset Form</Button>
+                <Button variant="secondary" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Back to Top</Button>
+              </div>
+            </div>
+
+            <div className="md:col-span-1 border rounded-2xl p-3 space-y-2">
+              <div className="font-semibold">Unit Details</div>
+              {unit ? (
+                <div className="text-sm space-y-1">
+                  <div><span className="text-slate-500">Name:</span> {unit.name}</div>
+                  <div><span className="text-slate-500">Type:</span> {unit.type}</div>
+                  <div><span className="text-slate-500">Rent:</span> {currency(unit.rent)}</div>
+                  <div><span className="text-slate-500">Tenant:</span> {unit.tenant || "—"}</div>
+                </div>
+              ) : (
+                <div className="text-sm text-slate-500">Select a unit to preview details.</div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      /* ------------- Expenses ------------- */
+      function ExpensesSection({ expenses, addExpense }) {
+        const [form, setForm] = useState({ date: todayStr() });
+
+        const resetForm = () => setForm({ date: todayStr() });
+
+        const submit = () => {
+          if (!form.category || !form.amount) return alert("Fill Category and Amount");
+          addExpense({ ...form, amount: Number(form.amount || 0) });
+          resetForm();
+        };
+
+        return (
+          <div className="grid md:grid-cols-3 gap-3 md:gap-4">
+            <div className="md:col-span-1 bg-slate-50 border rounded-2xl p-3 space-y-2">
+              <div className="font-semibold">Add Expense</div>
+              <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+              <Input placeholder="Category (e.g., Maintenance)" value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+              <Input placeholder="Vendor/Payee" value={form.vendor || ""} onChange={(e) => setForm({ ...form, vendor: e.target.value })} />
+              <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+              <Input placeholder="Notes" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              <div className="flex gap-2">
+                <Button onClick={submit}>Save Expense</Button>
+                <Button variant="secondary" onClick={resetForm}>Reset Form</Button>
+              </div>
+            </div>
+
+            <div className="md:col-span-2 overflow-auto rounded-2xl border">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-100 text-slate-600">
+                  <tr>
+                    <th className="p-3 text-left">Date</th>
+                    <th className="p-3 text-left">Category</th>
+                    <th className="p-3 text-left">Vendor</th>
+                    <th className="p-3 text-right">Amount</th>
+                    <th className="p-3 text-left">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses.map((e) => (
+                    <tr key={e.id} className="border-t">
+                      <td className="p-3">{e.date}</td>
+                      <td className="p-3">{e.category}</td>
+                      <td className="p-3">{e.vendor || "—"}</td>
+                      <td className="p-3 text-right">{currency(e.amount)}</td>
+                      <td className="p-3">{e.notes || ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      }
+
+      /* ------------- Settings ------------- */
+      function OrgSettings({ org, updateOrg, clearOrgFields, restoreDemoOrg, clearPayments, clearExpenses, factoryReset }) {
+        return (
+          <div className="grid md:grid-cols-2 gap-3 md:gap-4">
+            <div className="space-y-2">
+              <div className="text-sm text-slate-500">Organization / Landlord Info</div>
+              <Input placeholder="Name" value={org.name} onChange={(e) => updateOrg({ name: e.target.value })} />
+              <Input placeholder="Address" value={org.address} onChange={(e) => updateOrg({ address: e.target.value })} />
+              <Input placeholder="Phone" value={org.phone} onChange={(e) => updateOrg({ phone: e.target.value })} />
+              <Input placeholder="Email" value={org.email} onChange={(e) => updateOrg({ email: e.target.value })} />
+              <Input placeholder="Receipt Footer Note" value={org.note} onChange={(e) => updateOrg({ note: e.target.value })} />
+              <div className="flex gap-2 pt-1">
+                <Button variant="secondary" onClick={clearOrgFields}>Reset Org Fields</Button>
+                <Button variant="secondary" onClick={restoreDemoOrg}>Restore Demo Org</Button>
+              </div>
+            </div>
+
+            <div className="space-y-3 bg-slate-50 border rounded-2xl p-3">
+              <div className="text-sm text-slate-500">Data Management / Reset</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <Button variant="danger" onClick={clearPayments}>Clear ALL Payments</Button>
+                <Button variant="danger" onClick={clearExpenses}>Clear ALL Expenses</Button>
+                <Button variant="danger" onClick={factoryReset}>Factory Reset (Everything)</Button>
+              </div>
+              <div className="text-xs text-slate-500">
+                • Clearing payments removes all receipts. <br/>
+                • Clearing expenses removes all expense entries. <br/>
+                • Factory reset restores demo units and org, and wipes payments & expenses.
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ------------- Receipt Modal (printable) ------------- */
+      function ReceiptModal({ org, payment, unit, onClose }) {
+        const ref = useRef();
+
+        const printNow = () => {
+          const w = window.open("", "_blank");
+          const html = renderReceiptHTML(org, payment, unit);
+          w.document.write(html);
+          w.document.close();
+          w.focus();
+          w.print();
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-0 md:p-6">
+            <div ref={ref} className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl shadow-xl">
+              <div className="p-3 border-b flex items-center justify-between">
+                <div className="font-semibold">Receipt Preview</div>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={printNow}>Print</Button>
+                  <Button variant="danger" onClick={onClose}>Close</Button>
+                </div>
+              </div>
+              <div className="p-4 bg-slate-50">
+                <div className="bg-white border rounded-xl p-4" dangerouslySetInnerHTML={{ __html: renderReceiptInner(org, payment, unit) }} />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function renderReceiptInner(org, payment, unit) {
+        return `
+          <div style="font-family: ui-sans-serif, system-ui; max-width: 700px; margin: 0 auto;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+              <div>
+                <div style="font-size:20px; font-weight:700;">${escapeHTML(org.name)}</div>
+                <div style="font-size:12px; color:#334155;">${escapeHTML(org.address)}</div>
+                <div style="font-size:12px; color:#334155;">Phone: ${escapeHTML(org.phone)} | Email: ${escapeHTML(org.email)}</div>
+              </div>
+              <div style="text-align:right; font-size:12px; color:#334155;">
+                <div><b>Receipt #</b>: ${escapeHTML(payment.receiptNo)}</div>
+                <div><b>Date</b>: ${escapeHTML(payment.date)}</div>
+              </div>
+            </div>
+            <hr style="margin:12px 0; border:none; border-top:1px dashed #cbd5e1;" />
+            <div style="font-size:14px; margin-bottom:8px;"><b>Received From:</b> ${escapeHTML(payment.tenant)}</div>
+            <table style="width:100%; font-size:14px; border-collapse:collapse;">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding:8px; background:#f1f5f9;">Unit</th>
+                  <th style="text-align:left; padding:8px; background:#f1f5f9;">For Month</th>
+                  <th style="text-align:center; padding:8px; background:#f1f5f9;">Method</th>
+                  <th style="text-align:right; padding:8px; background:#f1f5f9;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="padding:8px; border-top:1px solid #e2e8f0;">${escapeHTML(unit?.name || payment.unitId)}</td>
+                  <td style="padding:8px; border-top:1px solid #e2e8f0;">${escapeHTML(payment.forMonth)}</td>
+                  <td style="padding:8px; text-align:center; border-top:1px solid #e2e8f0;">${escapeHTML(payment.method)}</td>
+                  <td style="padding:8px; text-align:right; border-top:1px solid #e2e8f0;"><b>${currency(payment.amount)}</b></td>
+                </tr>
+              </tbody>
+            </table>
+            ${payment.notes ? `<div style="margin-top:8px; font-size:12px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""}
+            <div style="margin-top:24px; display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:12px; color:#334155;">${escapeHTML(org.note || "")}</div>
+              <div style="text-align:center;">
+                <div style="border-top:1px solid #94a3b8; padding-top:6px; font-size:12px;">Authorized Signature</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderReceiptHTML(org, payment, unit) {
+        return `<!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>${escapeHTML(org.name)} — Receipt ${escapeHTML(payment.receiptNo)}</title>
+          <style>
+            @media print {
+              @page { size: A4; margin: 16mm; }
+            }
+            body { background:#f8fafc; margin:0; padding:16px; }
+            .sheet { background:white; padding:16px; border:1px solid #e2e8f0; border-radius:12px; }
+          </style>
+        </head>
+        <body>
+          <div class="sheet">${renderReceiptInner(org, payment, unit)}</div>
+        </body>
+        </html>`;
+      }
+
+      function escapeHTML(str) {
+        return String(str || "").replace(/[&<>'"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
+      }
+
+      /* ------------- Mount app ------------- */
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
