@@ -1004,7 +1004,6 @@
       }
 
       function NewReceiptForm({ units, addPayment, data }) {
-        // Updated state to include default reason
         const [form, setForm] = useState({ 
             date: todayStr(), 
             method: "Cash",
@@ -1033,14 +1032,13 @@
             });
         }
 
-        const validateForm = (currentForm) => {
+        const validateForm = (currentForm, isSubmit = false) => {
             const errors = {};
             if (!currentForm.unitId) errors.unitId = "Unit is required.";
             if (!currentForm.tenant) errors.tenant = "Tenant name is required.";
             
             const reason = currentForm.reason || 'Rent';
             
-            // Validation for 'For Month' based on reason
             if ((reason === 'Rent' || reason === 'Advance Rent') && !currentForm.forMonth) {
                 errors.forMonth = "Billing month is required for rent or advance payments.";
             }
@@ -1048,12 +1046,12 @@
             const amount = Number(currentForm.amount);
             if (isNaN(amount) || amount <= 0) errors.amount = "Amount must be greater than zero.";
             
-            setFormErrors(errors);
+            if(isSubmit) setFormErrors(errors);
             return Object.keys(errors).length === 0;
         };
 
         const submit = () => {
-          if (!validateForm(form)) return;
+          if (!validateForm(form, true)) return;
           
           const reason = form.reason || 'Rent';
           
@@ -1061,7 +1059,6 @@
             ...form, 
             amount: Number(form.amount || 0),
             reason: reason,
-            // Clear forMonth if it's a security deposit, store as N/A to keep the field.
             forMonth: reason === 'Security Deposit' ? 'N/A' : form.forMonth, 
           };
           addPayment(newPayment);
@@ -1085,6 +1082,7 @@
 
         const unit = units.find((u) => u.id === form.unitId);
         
+        // This is a bit of a cheat, but React state update ensures re-render if form state changes
         const isFormValid = useMemo(() => validateForm(form), [form]);
 
         return (
@@ -1100,7 +1098,7 @@
                             unitId, 
                             tenant: units.find(u => u.id === unitId)?.tenant || "" 
                         });
-                        if (formErrors.unitId) validateForm({ ...form, unitId });
+                        validateForm({ ...form, unitId });
                     }}
                     error={formErrors.unitId}
                 >
@@ -1112,9 +1110,8 @@
                 <Select 
                     value={form.reason || "Rent"}
                     onChange={(e) => {
-                        // When reason changes, reset forMonth validation
                         setForm({ ...form, reason: e.target.value, forMonth: '' });
-                        if (formErrors.forMonth) validateForm({ ...form, reason: e.target.value });
+                        validateForm({ ...form, reason: e.target.value });
                     }}
                 >
                     <option value="Rent">Monthly Rent</option>
@@ -1129,7 +1126,7 @@
                     value={form.tenant || (unit?.tenant || "")} 
                     onChange={(e) => {
                         setForm({ ...form, tenant: e.target.value });
-                        if (formErrors.tenant) validateForm({ ...form, tenant: e.target.value });
+                        validateForm({ ...form, tenant: e.target.value });
                     }}
                     error={formErrors.tenant}
                 />
@@ -1141,7 +1138,7 @@
                     value={form.amount ?? ""} 
                     onChange={(e) => {
                         setForm({ ...form, amount: e.target.value });
-                        if (formErrors.amount) validateForm({ ...form, amount: e.target.value });
+                        validateForm({ ...form, amount: e.target.value });
                     }}
                     error={formErrors.amount}
                 />
@@ -1151,7 +1148,7 @@
                     value={form.reason === 'Security Deposit' ? '' : form.forMonth || ""} 
                     onChange={(e) => {
                         setForm({ ...form, forMonth: e.target.value });
-                        if (formErrors.forMonth) validateForm({ ...form, forMonth: e.target.value });
+                        validateForm({ ...form, forMonth: e.target.value });
                     }}
                     error={formErrors.forMonth}
                     disabled={form.reason === 'Security Deposit'}
@@ -1168,7 +1165,6 @@
                   <option>Card</option>
                 </Select>
               </div>
-              {/* Using a textarea for better notes input */}
               <textarea 
                   placeholder="Notes (optional, supports multiple lines)" 
                   value={form.notes || ""} 
