@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mobile ERP — Single-File HTML (Tenant Profile & Advanced Payments)</title>
+    <title>Mobile ERP — Single-File HTML (v6: DD-MM-YYYY Receipt Date)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -27,6 +27,51 @@
           height: 100%;
         }
       }
+      /* Custom toggle styling for better UX */
+      .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 24px;
+      }
+
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 24px;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 2px;
+        bottom: 2px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+      }
+
+      input:checked + .slider {
+        background-color: #4f46e5; /* indigo-600 */
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(24px);
+      }
     </style>
   </head>
   <body>
@@ -37,7 +82,7 @@
 
       /* ------------- Utilities ------------- */
       const STORAGE_KEY = "rental_erp_v1";
-      const todayStr = () => new Date().toISOString().slice(0, 10);
+      const todayStr = () => new Date().toISOString().slice(0, 10); // Returns YYYY-MM-DD
 
       const currency = (n) => {
         const num = Number(n || 0);
@@ -51,17 +96,27 @@
         }
       };
       
+      const formatDateDDMMYYYY = (dateStr) => {
+          if (!dateStr || dateStr.length < 10) return dateStr;
+          // Assumes YYYY-MM-DD format from todayStr()
+          const [year, month, day] = dateStr.split('-');
+          return `${day}-${month}-${year}`;
+      };
+      
       const formatMonthKey = (key) => {
         if (!key || key === 'N/A') return "N/A";
-        // Safely extract year and month to create a date object
         try {
             const [year, month] = key.split('-');
             const date = new Date(year, month - 1, 1);
-            if (isNaN(date)) return key; // return raw if invalid date
+            if (isNaN(date)) return key;
             return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
         } catch (e) {
             return key;
         }
+      };
+      
+      const getMonthName = (date = new Date()) => {
+          return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
       };
 
       const monthKey = (dateStr) => {
@@ -70,7 +125,8 @@
       };
 
       const nextReceiptNo = (allPayments) => {
-        const yyyymm = monthKey(new Date().toISOString());
+        const now = new Date();
+        const yyyymm = monthKey(now.toISOString());
         const prefix = `RC-${yyyymm}-`;
         
         const maxNum = allPayments
@@ -97,7 +153,7 @@
       };
       
       const downloadFile = (base64, filename) => {
-          const parts = base64.split(';base64,');
+          const parts = base64.data.split(';base64,');
           if (parts.length !== 2) {
               alert("Error: Invalid Base64 data format.");
               return;
@@ -140,6 +196,32 @@
         "Maintenance", "Utilities (Electricity, Gas, Water)", "Property Tax", 
         "Salary (Staff/Guard)", "Advertising/Marketing", "Other"
       ];
+      
+      const whatsappReminderLink = (unit, dueAmount) => {
+          // Clean phone number: remove non-numeric chars, assume Bangladesh code 88 if not international
+          let phone = unit.tenantPhone ? String(unit.tenantPhone).replace(/[^0-9+]/g, '') : '';
+          if (!phone) return null;
+          
+          // Format for wa.me link: remove + and ensure it starts with country code (88 for Bangladesh)
+          const internationalFormat = phone.startsWith('+') ? phone.substring(1) : (phone.startsWith('88') ? phone : '88' + phone);
+          
+          const message = `
+Dear ${unit.tenant || 'Tenant'},
+
+This is a friendly reminder that the rent of ${unit.name} (${unit.id}) for ${getMonthName()} is due in 2 days, on the ${unit.dueDay}th.
+
+The outstanding rent amount is ${currency(dueAmount)}.
+
+Please make the payment before the due date. Thank you!
+
+Regards,
+${unit.org.name || 'Landlord'}
+          `.trim();
+          
+          const encodedMessage = encodeURIComponent(message);
+          
+          return `https://wa.me/${internationalFormat}?text=${encodedMessage}`;
+      };
 
 
       /* ------------- Demo initial data ------------- */
@@ -158,9 +240,10 @@
             name: `Flat ${i + 1}`,
             floor: Math.ceil((i + 1) / 2),
             rent: 15000,
-            dueDay: 5,
-            tenant: "",
-            // NEW: Tenant Profile fields
+            dueDay: i < 5 ? 5 : 20, // Set some units for 5th, some for 20th
+            tenant: i === 0 ? "Mr. Abul Kasem" : "",
+            tenantPhone: i === 0 ? "8801700000001" : "",
+            whatsappReminderEnabled: i === 0, // Enabled for F1
             tenantPhoto: null,
             tenantNid: null,
             tenantAgreement: null,
@@ -171,9 +254,10 @@
             name: `Shop ${i + 1}`,
             floor: 0,
             rent: 25000,
-            dueDay: 5,
+            dueDay: 10,
             tenant: "",
-            // NEW: Tenant Profile fields
+            tenantPhone: "",
+            whatsappReminderEnabled: false,
             tenantPhoto: null,
             tenantNid: null,
             tenantAgreement: null,
@@ -195,12 +279,14 @@
               tenantPhoto: u.tenantPhoto || null,
               tenantNid: u.tenantNid || null,
               tenantAgreement: u.tenantAgreement || null,
+              tenantPhone: u.tenantPhone || "", // NEW: Tenant Phone
+              whatsappReminderEnabled: u.whatsappReminderEnabled ?? false, // NEW: Reminder Toggle
           }));
           
           // Ensure old payments get a default reason
           parsed.payments = (parsed.payments || []).map(p => ({
               ...p, 
-              reason: p.reason || 'Rent' 
+              reason: p.reason || 'Rent'
           }));
 
           return { ...initialData, ...parsed };
@@ -263,13 +349,13 @@
         </>
       );
 
-      // Improved Button component with 'size' prop, ARIA support, and refined styles
-      const Button = ({ children, variant = "primary", size = "base", className, title, ...rest }) => {
+      const Button = ({ children, variant = "primary", size = "base", className, title, asLink = false, ...rest }) => {
         const styles = {
           primary: "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-indigo-500/50",
           secondary: "bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 active:bg-slate-300", 
           danger: "bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800",
           ghost: "bg-transparent text-slate-700 hover:bg-slate-100 active:bg-slate-200 shadow-none",
+          whatsapp: "bg-[#25D366] text-white hover:bg-[#1DA851] active:bg-[#1A934A] shadow-green-500/50",
         };
         const sizes = {
           small: "px-3 py-1 text-xs",
@@ -277,22 +363,35 @@
           large: "px-6 py-3 text-base md:text-lg",
         };
         
-        // Simple ARIA logic for buttons that might contain icons or be titles
         const ariaLabel = title || (typeof children === 'string' ? children : undefined);
-
-
-        return (
-          <button
-            {...rest}
-            aria-label={ariaLabel}
-            className={classNames(
+        const finalClassName = classNames(
               "rounded-xl transition shadow-sm font-medium",
               "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400", 
               "disabled:opacity-50 disabled:cursor-not-allowed",
               styles[variant],
               sizes[size], 
               className
-            )}
+        );
+
+        if (asLink) {
+            return (
+                <a
+                    {...rest}
+                    aria-label={ariaLabel}
+                    className={finalClassName}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    {children}
+                </a>
+            );
+        }
+
+        return (
+          <button
+            {...rest}
+            aria-label={ariaLabel}
+            className={finalClassName}
           >
             {children}
           </button>
@@ -333,7 +432,7 @@
         const [search, setSearch] = useState(""); 
         const [month, setMonth] = useState(""); 
         const [showReceipt, setShowReceipt] = useState(null); 
-        const [selectedUnitId, setSelectedUnitId] = useState(null); // State to manage which unit profile is open
+        const [selectedUnitId, setSelectedUnitId] = useState(null); 
 
         useEffect(() => saveData(data), [data]);
 
@@ -352,10 +451,11 @@
         const outstandingByUnit = useMemo(() => {
           const now = new Date();
           const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          // Start with the rent amount as the due amount
           const map = Object.fromEntries(units.map((u) => [u.id, u.rent || 0])); 
           
           payments
-            .filter((p) => (p.forMonth || "").startsWith(ym) && (p.reason === 'Rent' || p.reason === 'Advance Rent' || !p.reason)) // Only count payments for the current month's rent
+            .filter((p) => (p.forMonth || "").startsWith(ym) && (p.reason === 'Rent' || p.reason === 'Advance Rent' || !p.reason)) 
             .forEach((p) => {
               map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0);
             });
@@ -377,7 +477,6 @@
         // Data helpers
         const updateOrg = (patch) => setData((d) => ({ ...d, org: { ...d.org, ...patch } }));
         
-        // Function to update or insert a unit
         const upsertUnit = (unit) =>
           setData((d) => ({
             ...d,
@@ -386,7 +485,6 @@
               : [...d.units, unit],
           }));
 
-        // Function to update only tenant profile fields for a unit
         const updateTenantProfile = (unitId, updates) =>
             setData((d) => ({
                 ...d,
@@ -408,16 +506,15 @@
           reader.onload = (evt) => {
             try {
               const parsed = JSON.parse(evt.target.result);
-              // Simple check for basic structure
               if (parsed.units && parsed.payments) {
-                 // Ensure old payments get a default reason
-                 parsed.payments = parsed.payments.map(p => ({...p, reason: p.reason || 'Rent' }));
-                 // Ensure new unit fields exist
+                 parsed.payments = (parsed.payments || []).map(p => ({...p, reason: p.reason || 'Rent' }));
                  parsed.units = (parsed.units || []).map(u => ({
                     ...u,
                     tenantPhoto: u.tenantPhoto || null,
                     tenantNid: u.tenantNid || null,
                     tenantAgreement: u.tenantAgreement || null,
+                    tenantPhone: u.tenantPhone || "", // Ensure new fields exist on import
+                    whatsappReminderEnabled: u.whatsappReminderEnabled ?? false, // Ensure new fields exist on import
                  }));
                  setData(parsed);
                  alert("Import successful ✅");
@@ -482,7 +579,7 @@
                       key={key}
                       variant={tab === key ? "primary" : "secondary"}
                       className="w-full relative"
-                      onClick={() => { setTab(key); setSelectedUnitId(null); }} // Close profile on tab change
+                      onClick={() => { setTab(key); setSelectedUnitId(null); }}
                     >
                       {label}
                       {indicator && (
@@ -498,7 +595,13 @@
 
             <main className="mx-auto max-w-6xl p-4 space-y-4 md:space-y-6">
               {tab === "dashboard" && (
-                <DashboardSection totals={totals} units={units} outstandingByUnit={outstandingByUnit} setTab={setTab} />
+                <DashboardSection 
+                    totals={totals} 
+                    units={units} 
+                    outstandingByUnit={outstandingByUnit} 
+                    setTab={setTab} 
+                    org={data.org}
+                />
               )}
 
               {tab === "units" && (
@@ -572,8 +675,46 @@
       }
 
       /* ------------- Dashboard ------------- */
-      function DashboardSection({ totals, units, outstandingByUnit, setTab }) {
+      function DashboardSection({ totals, units, outstandingByUnit, setTab, org }) {
+        const now = new Date();
         const totalDue = Object.values(outstandingByUnit).reduce((s, v) => s + Math.max(0, v), 0);
+
+        // Prepare units with due amounts
+        const unitsWithDue = useMemo(() => units.map(u => ({
+            ...u,
+            dueAmount: outstandingByUnit[u.id] || 0
+        })), [units, outstandingByUnit]);
+
+
+        // 1. Past Due Units: Due > 0 AND today's day > dueDay
+        const pastDueUnits = unitsWithDue
+            .filter(u => u.dueAmount > 0 && now.getDate() > u.dueDay);
+
+        // 2. Due Soon Units: Due > 0 AND today's day <= dueDay
+        const dueSoonUnits = unitsWithDue
+            .filter(u => u.dueAmount > 0 && now.getDate() <= u.dueDay);
+            
+        // 3. Reminder Due Today: Enabled, Phone Exists, Due > 0, and Due Day is 2 days from now
+        const reminderDueUnits = unitsWithDue
+            .filter(u => u.whatsappReminderEnabled && u.tenantPhone && u.dueAmount > 0)
+            .filter(u => {
+                const dueDay = u.dueDay;
+                const today = now.getDate();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+
+                // Calculate the date 2 days before the due day in this month
+                const dueDate = new Date(currentYear, currentMonth, dueDay);
+                const reminderDate = new Date(dueDate);
+                reminderDate.setDate(dueDate.getDate() - 2);
+                
+                // Compare only the date components (normalized to midnight)
+                const reminderDay = new Date(reminderDate.getFullYear(), reminderDate.getMonth(), reminderDate.getDate()).getTime();
+                const todayMidnight = new Date(currentYear, currentMonth, today).getTime();
+                
+                return todayMidnight === reminderDay;
+            });
+
 
         return (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
@@ -592,22 +733,75 @@
                 </div>
               </Section>
             </div>
-
-            <div className="col-span-2 md:col-span-4">
-              <Section title="Current Month Dues by Unit">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {units.map((u) => (
-                    <div key={u.id} className="flex items-center justify-between rounded-xl border p-3 bg-slate-50">
-                      <div>
-                        <div className="font-medium">{u.name} <span className="text-xs text-slate-500">({u.type})</span></div>
-                        <div className="text-xs text-slate-500">Tenant: {u.tenant || "—"}</div>
-                      </div>
-                      <div className={classNames("text-right font-semibold", (outstandingByUnit[u.id] || 0) > 0 ? "text-rose-600" : "text-emerald-600")}>{currency(Math.max(0, outstandingByUnit[u.id] || 0))}</div>
+            
+            {/* NEW: WhatsApp Reminder List */}
+            <div className="col-span-2 md:col-span-4 space-y-4">
+                <Section title="🔔 Reminder Due Today (2 Days before Due Date)">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {reminderDueUnits.length > 0 ? (
+                            reminderDueUnits.map((u) => (
+                                <div key={u.id} className="flex items-center justify-between rounded-xl border p-3 bg-indigo-50 border-indigo-200">
+                                    <div>
+                                        <div className="font-medium text-indigo-800">{u.name} <span className="text-xs text-indigo-500">({u.type})</span></div>
+                                        <div className="text-xs text-indigo-500">Tenant: {u.tenant || "—"} | Due Day: {u.dueDay}th</div>
+                                    </div>
+                                    <Button 
+                                        variant="whatsapp" 
+                                        size="small" 
+                                        asLink
+                                        href={whatsappReminderLink({ ...u, org }, u.dueAmount)}
+                                        title={`Send WhatsApp reminder to ${u.tenant}`}
+                                    >
+                                        Send Reminder
+                                    </Button>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center text-slate-500 py-4 col-span-2">No WhatsApp reminders are due today.</div>
+                        )}
                     </div>
-                  ))}
-                  {units.length === 0 && <div className="text-center text-slate-500 py-4 col-span-2">No units defined.</div>}
-                </div>
-              </Section>
+                </Section>
+            </div>
+            {/* END NEW: WhatsApp Reminder List */}
+
+            <div className="col-span-2 md:col-span-4 space-y-4">
+                {/* Past Due List */}
+                <Section title="🔴 Units Past Due (Rent Due Date Passed)">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {pastDueUnits.length > 0 ? (
+                            pastDueUnits.map((u) => (
+                                <div key={u.id} className="flex items-center justify-between rounded-xl border p-3 bg-rose-50 border-rose-200">
+                                    <div>
+                                        <div className="font-medium text-rose-800">{u.name} <span className="text-xs text-rose-500">({u.type})</span></div>
+                                        <div className="text-xs text-rose-500">Tenant: {u.tenant || "—"} | Due Day: {u.dueDay}th</div>
+                                    </div>
+                                    <div className="text-right font-bold text-rose-700">{currency(u.dueAmount)}</div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center text-emerald-600 py-4 col-span-2">✅ No units are currently past their due date.</div>
+                        )}
+                    </div>
+                </Section>
+
+                {/* Units Due Soon List (Today or Future) */}
+                <Section title="🟡 Units Due Soon (Due Day: Today or Later)">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {dueSoonUnits.length > 0 ? (
+                            dueSoonUnits.map((u) => (
+                                <div key={u.id} className="flex items-center justify-between rounded-xl border p-3 bg-yellow-50 border-yellow-200">
+                                    <div>
+                                        <div className="font-medium text-yellow-800">{u.name} <span className="text-xs text-yellow-500">({u.type})</span></div>
+                                        <div className="text-xs text-yellow-500">Tenant: {u.tenant || "—"} | Due Day: {u.dueDay}th</div>
+                                    </div>
+                                    <div className="text-right font-bold text-yellow-700">{currency(u.dueAmount)}</div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center text-slate-500 py-4 col-span-2">No units have pending rent due before the due day.</div>
+                        )}
+                    </div>
+                </Section>
             </div>
           </div>
         );
@@ -624,17 +818,38 @@
 
       /* ------------- Units ------------- */
       function UnitsTable({ units, allUnits, upsertUnit, deleteUnit, onEditProfile }) {
-        const [form, setForm] = useState({ type: "Flat", rent: 15000, dueDay: 5 });
+        const [form, setForm] = useState({ 
+            type: "Flat", 
+            rent: 15000, 
+            dueDay: 5, 
+            tenantPhone: "", 
+            whatsappReminderEnabled: false 
+        });
         const [formErrors, setFormErrors] = useState({});
 
         const edit = (u) => {
             setFormErrors({});
-            setForm({ ...u, originalId: u.id });
+            setForm({ 
+                ...u, 
+                originalId: u.id,
+                tenantPhone: u.tenantPhone || "",
+                whatsappReminderEnabled: u.whatsappReminderEnabled ?? false,
+            });
         };
         
         const reset = () => {
             setFormErrors({});
-            setForm({ type: "Flat", rent: 15000, dueDay: 5, id: "", name: "", floor: "", tenant: "" });
+            setForm({ 
+                type: "Flat", 
+                rent: 15000, 
+                dueDay: 5, 
+                id: "", 
+                name: "", 
+                floor: "", 
+                tenant: "",
+                tenantPhone: "",
+                whatsappReminderEnabled: false,
+            });
         };
 
         const validateForm = (currentForm, isSubmit = false) => {
@@ -646,7 +861,6 @@
             if (!currentId) {
                 errors.id = "Unit ID is required.";
             } else if (!isEditing || currentId !== currentForm.originalId) {
-                // Check uniqueness only if adding or changing ID during edit
                 if (allUnits.some(u => u.id === currentId && u.id !== currentForm.originalId)) {
                     errors.id = "This Unit ID already exists.";
                 }
@@ -667,7 +881,6 @@
             return Object.keys(errors).length === 0;
         };
         
-        // Immediate validation for ID input
         const handleIdChange = (e) => {
             const newId = e.target.value;
             setForm({ ...form, id: newId });
@@ -688,15 +901,17 @@
         const submit = () => {
           if (!validateForm(form, true)) return;
           
+          const existingUnit = allUnits.find(u => u.id === form.id);
+
           const newUnit = { 
             ...form, 
             id: form.id.trim(), 
             rent: Number(form.rent || 0), 
             dueDay: Number(form.dueDay || 1) ,
-            // Ensure document fields are carried over if editing
-            tenantPhoto: form.tenantPhoto || null,
-            tenantNid: form.tenantNid || null,
-            tenantAgreement: form.tenantAgreement || null,
+            // Preserve existing tenant profile data if not explicitly changing units/resetting form
+            tenantPhoto: existingUnit ? existingUnit.tenantPhoto : (form.tenantPhoto || null),
+            tenantNid: existingUnit ? existingUnit.tenantNid : (form.tenantNid || null),
+            tenantAgreement: existingUnit ? existingUnit.tenantAgreement : (form.tenantAgreement || null),
           };
           
           upsertUnit(newUnit);
@@ -713,7 +928,7 @@
                     placeholder="Unit ID (e.g., F1)*" 
                     value={form.id || ""} 
                     onChange={handleIdChange} 
-                    disabled={!!form.originalId && !form.id} // Disable ID change only if actively editing and ID is set
+                    disabled={!!form.originalId && !form.id} 
                     error={formErrors.id}
                   />
                   <Select 
@@ -746,7 +961,27 @@
                   error={formErrors.dueDay}
                 />
                 <Input placeholder="Tenant Name" value={form.tenant || ""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
+                <Input 
+                    type="tel" 
+                    placeholder="Tenant Phone (e.g., +8801...)" 
+                    value={form.tenantPhone || ""} 
+                    onChange={(e) => setForm({ ...form, tenantPhone: e.target.value })} 
+                />
               </div>
+              
+              {/* WhatsApp Reminder Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                  <span className="text-sm font-medium text-slate-700">Enable WhatsApp Reminder (2 days prior)</span>
+                  <label className="toggle-switch">
+                      <input 
+                          type="checkbox" 
+                          checked={form.whatsappReminderEnabled} 
+                          onChange={(e) => setForm({ ...form, whatsappReminderEnabled: e.target.checked })}
+                      />
+                      <span className="slider"></span>
+                  </label>
+              </div>
+
               <div className="flex gap-2 mt-2">
                 <Button onClick={submit} disabled={!validateForm(form)}>Save</Button>
                 <Button variant="secondary" onClick={reset}>Clear</Button>
@@ -761,6 +996,7 @@
                     <th className="p-3 text-left">Name</th>
                     <th className="p-3">Rent</th>
                     <th className="p-3">Tenant</th>
+                    <th className="p-3">Reminder</th>
                     <th className="p-3">Actions</th>
                   </tr>
                 </thead>
@@ -771,6 +1007,12 @@
                       <td className="p-3">{u.name}</td>
                       <td className="p-3 text-right font-semibold">{currency(u.rent)}</td>
                       <td className="p-3">{u.tenant || "—"}</td>
+                      <td className="p-3 text-center">
+                          {u.whatsappReminderEnabled ? 
+                              (u.tenantPhone ? "✅" : "⚠️ No Phone") : 
+                              "❌"
+                          }
+                      </td>
                       <td className="p-3">
                         <div className="flex flex-col sm:flex-row gap-2">
                           <Button variant="secondary" size="small" onClick={() => edit(u)} title={`Edit ${u.name}`}>Edit Unit</Button>
@@ -798,6 +1040,10 @@
       }
       
       /* ------------- Tenant Profile Modal ------------- */
+      function escapeHTML(str) {
+        return String(str || "").replace(/[&<>'"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
+      }
+
       function TenantProfileModal({ unit, onClose, updateProfile }) {
           const [profile, setProfile] = useState(unit);
           const modalRef = useRef(null);
@@ -816,11 +1062,9 @@
           const handleFileChange = (field) => (event) => {
               const file = event.target.files[0];
               if (!file) return;
-
-              // Check file size limit (e.g., 5MB for a single file)
               if (file.size > 5 * 1024 * 1024) {
                   alert("File size exceeds 5MB limit. Please choose a smaller file.");
-                  event.target.value = null; // Clear the input
+                  event.target.value = null;
                   return;
               }
 
@@ -851,16 +1095,18 @@
           
           const handleDownload = (file) => {
               if (file && file.data && file.name) {
-                  downloadFile(file.data, file.name);
+                  downloadFile(file, file.name);
               }
           }
 
           const handleSave = () => {
               updateProfile(unit.id, {
-                  tenant: profile.tenant, // Allow saving name change if needed
+                  tenant: profile.tenant, 
                   tenantPhoto: profile.tenantPhoto,
                   tenantNid: profile.tenantNid,
                   tenantAgreement: profile.tenantAgreement,
+                  tenantPhone: profile.tenantPhone, // Save phone number from profile modal too
+                  whatsappReminderEnabled: profile.whatsappReminderEnabled, // Save toggle too
               });
               alert(`Tenant profile for ${unit.name} saved successfully.`);
               onClose();
@@ -891,6 +1137,7 @@
                           />
                       </label>
                   )}
+                  {/* Image preview only for tenant photo and if it's an image base64 string */}
                   {field === 'tenantPhoto' && profile.tenantPhoto && profile.tenantPhoto.data && profile.tenantPhoto.data.startsWith('data:image') && (
                       <img 
                           src={profile.tenantPhoto.data} 
@@ -899,7 +1146,7 @@
                       />
                   )}
                   <p className="text-xs text-slate-500 mt-1">
-                      Max 5MB. Photo/PDF accepted. Stored in browser storage (exported in backup).
+                      Max 5MB. Photo/PDF accepted.
                   </p>
               </div>
           );
@@ -929,6 +1176,23 @@
                                   value={profile.tenant || ""} 
                                   onChange={(e) => setProfile(prev => ({ ...prev, tenant: e.target.value }))} 
                               />
+                              <Input 
+                                  type="tel" 
+                                  placeholder="Tenant Phone (e.g., +8801...)" 
+                                  value={profile.tenantPhone || ""} 
+                                  onChange={(e) => setProfile(prev => ({ ...prev, tenantPhone: e.target.value }))} 
+                              />
+                              <div className="flex items-center justify-between pt-1">
+                                  <span className="text-sm font-medium text-slate-700">Enable WhatsApp Reminder (2 days prior)</span>
+                                  <label className="toggle-switch">
+                                      <input 
+                                          type="checkbox" 
+                                          checked={profile.whatsappReminderEnabled} 
+                                          onChange={(e) => setProfile(prev => ({ ...prev, whatsappReminderEnabled: e.target.checked }))}
+                                      />
+                                      <span className="slider"></span>
+                                  </label>
+                              </div>
                           </div>
 
                           <div className="font-semibold text-base pt-2">Tenant Documents</div>
@@ -1059,7 +1323,7 @@
             ...form, 
             amount: Number(form.amount || 0),
             reason: reason,
-            forMonth: reason === 'Security Deposit' ? 'N/A' : form.forMonth, 
+            forMonth: reason === 'Security Deposit' || reason === 'Other' ? 'N/A' : form.forMonth, 
           };
           addPayment(newPayment);
           
@@ -1082,7 +1346,6 @@
 
         const unit = units.find((u) => u.id === form.unitId);
         
-        // This is a bit of a cheat, but React state update ensures re-render if form state changes
         const isFormValid = useMemo(() => validateForm(form), [form]);
 
         return (
@@ -1144,15 +1407,15 @@
                 />
                 <Input 
                     type="month" 
-                    placeholder={form.reason === 'Security Deposit' ? 'N/A' : "For Month*"} 
-                    value={form.reason === 'Security Deposit' ? '' : form.forMonth || ""} 
+                    placeholder={form.reason === 'Security Deposit' || form.reason === 'Other' ? 'N/A' : "For Month*"} 
+                    value={form.reason === 'Security Deposit' || form.reason === 'Other' ? '' : form.forMonth || ""} 
                     onChange={(e) => {
                         setForm({ ...form, forMonth: e.target.value });
                         validateForm({ ...form, forMonth: e.target.value });
                     }}
                     error={formErrors.forMonth}
-                    disabled={form.reason === 'Security Deposit'}
-                    title={form.reason === 'Security Deposit' ? 'For Month is N/A for Security Deposits.' : 'Select the month this payment covers.'}
+                    disabled={form.reason === 'Security Deposit' || form.reason === 'Other'}
+                    title={form.reason === 'Security Deposit' || form.reason === 'Other' ? `For Month is N/A for ${form.reason}.` : 'Select the month this payment covers.'}
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -1326,12 +1589,10 @@
 
       /* ------------- Receipt Modal (printable) ------------- */
       function ReceiptModal({ org, payment, unit, onClose }) {
-        // Simple manual focus management for accessibility
         const modalRef = useRef(null);
         useEffect(() => {
           if (modalRef.current) {
             modalRef.current.focus();
-            // Optional: add keyboard listener to close on escape key
             const handleKeyDown = (e) => {
                 if (e.key === 'Escape') onClose();
             };
@@ -1353,7 +1614,6 @@
         };
 
         return (
-          // Added role="dialog" and aria-modal for accessibility
           <div 
             ref={modalRef} 
             role="dialog" 
@@ -1361,7 +1621,6 @@
             aria-label={`Receipt Preview for ${payment.receiptNo}`}
             tabIndex="-1"
             className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-0 md:p-6 print-only"
-            // Click outside to close (optional, but good UX)
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
           >
             <div className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl shadow-xl">
@@ -1381,10 +1640,10 @@
       }
 
       function renderReceiptInner(org, payment, unit) {
-        // Convert newlines in notes to <br> for proper rendering in HTML
         const notesHtml = escapeHTML(payment.notes).replace(/\n/g, '<br/>');
         const paymentReason = escapeHTML(payment.reason || 'Rent');
-        const monthDisplay = payment.reason === 'Security Deposit' ? 'N/A' : formatMonthKey(payment.forMonth);
+        const monthDisplay = payment.reason === 'Security Deposit' || payment.reason === 'Other' ? 'N/A' : formatMonthKey(payment.forMonth);
+        const formattedDate = formatDateDDMMYYYY(payment.date); // Use new DD-MM-YYYY format
 
         return `
           <div style="font-family: ui-sans-serif, system-ui; max-width: 700px; margin: 0 auto;">
@@ -1396,11 +1655,11 @@
               </div>
               <div style="text-align:right; font-size:12px; color:#334155;">
                 <div><b>Receipt #</b>: ${escapeHTML(payment.receiptNo)}</div>
-                <div><b>Date</b>: ${escapeHTML(payment.date)}</div>
+                <div><b>Date</b>: ${formattedDate}</div>
               </div>
             </div>
             <hr style="margin:12px 0; border:none; border-top:1px dashed #cbd5e1;" />
-            <div style="font-size:14px; margin-bottom:8px;"><b>Received with Thanks From:</b> ${escapeHTML(payment.tenant)}</div>
+            <div style="font-size:14px; margin-bottom:8px;"><b>Received From:</b> ${escapeHTML(payment.tenant)}</div>
             <table style="width:100%; font-size:14px; border-collapse:collapse;">
               <thead>
                 <tr>
@@ -1463,10 +1722,6 @@
           <div class="sheet print-only">${renderReceiptInner(org, payment, unit)}</div>
         </body>
         </html>`;
-      }
-
-      function escapeHTML(str) {
-        return String(str || "").replace(/[&<>'"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
       }
 
       /* ------------- Mount app ------------- */
