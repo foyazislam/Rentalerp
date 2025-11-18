@@ -1,41 +1,16 @@
-<script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyB21YCBgR4qJgRRunwWPx3tUeELvFegxnE",
-    authDomain: "rentalerp-abe70.firebaseapp.com",
-    projectId: "rentalerp-abe70",
-    storageBucket: "rentalerp-abe70.firebasestorage.app",
-    messagingSenderId: "400286046254",
-    appId: "1:400286046254:web:50a278b1c0d97246b2a7bf"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-</script>
-
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mobile ERP — Cloud Sync with Authentication</title>
-    <!-- Tailwind CSS (CDN) -->
+    <title>Mobile ERP — Single-File HTML (Cloud Sync)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React 18 (UMD) + ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel for in-browser JSX transform (fine for small apps) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- NEW: Firebase SDKs for Cloud Firestore and Authentication -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     
     <style>
       html, body { height: 100%; background: #f1f5f9; }
@@ -47,36 +22,25 @@
     <script type="text/babel">
       const { useEffect, useMemo, useRef, useState } = React;
 
-      /* ------------- Firebase Setup (Using Canvas Globals) ------------- */
-      // Global variables provided by the Canvas environment
-      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-      const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-      const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+      /* ------------- Firebase Setup (REPLACE THESE CONFIG VALUES) ------------- */
+      // ⚠️ IMPORTANT: You must replace the placeholders below with your actual Firebase project configuration.
+      const firebaseConfig = {
+  apiKey: "AIzaSyB21YCBgR4qJgRRunwWPx3tUeELvFegxnE",
+  authDomain: "rentalerp-abe70.firebaseapp.com",
+  projectId: "rentalerp-abe70",
+  storageBucket: "rentalerp-abe70.firebasestorage.app",
+  messagingSenderId: "400286046254",
+  appId: "1:400286046254:web:50a278b1c0d97246b2a7bf"
+};
 
-      let app, db, auth;
-      if (firebaseConfig) {
-        // Initialize Firebase app
-        if (!firebase.apps.length) {
-            app = firebase.initializeApp(firebaseConfig);
-        } else {
-            app = firebase.app();
-        }
-        // Get service instances
-        db = app.firestore();
-        auth = app.auth();
-        // Enable verbose logging for debugging
-        // FIX: db.setLogLevel is not a function in the compat SDK. Use firebase.firestore.setLogLevel instead.
-        firebase.firestore.setLogLevel('debug'); 
+      // Initialize Firebase App and Firestore
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
       }
-
-      // Function to get the correct user-scoped document reference
-      const getUserDocRef = (userId) => {
-        if (!db || !userId) return null;
-        // Path MUST be /artifacts/{appId}/users/{userId}/erp_data/main_rental_data
-        return db.collection("artifacts").doc(appId)
-            .collection("users").doc(userId)
-            .collection("erp_data").doc("main_rental_data");
-      };
+      const db = firebase.firestore();
+      
+      // The single document ID where all your application data will be stored.
+      const FIRESTORE_DOC_ID = "main_rental_data"; 
 
       /* ------------- Utilities ------------- */
       const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -89,6 +53,7 @@
             .replace("BDT", "৳")
             .trim();
         } catch {
+          // Fallback for browsers that don't know BDT
           return `৳${num.toLocaleString()}`;
         }
       };
@@ -119,9 +84,11 @@
 
       const classNames = (...c) => c.filter(Boolean).join(" ");
 
+      // crypto.randomUUID fallback for older Safari if needed
       if (!(window.crypto && window.crypto.randomUUID)) {
         window.crypto = window.crypto || {};
         window.crypto.randomUUID = function () {
+          // RFC4122 v4-ish
           return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
             const r = (Math.random() * 16) | 0;
             const v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -147,49 +114,64 @@
             floor: Math.ceil((i + 1) / 2),
             rent: 15000,
             dueDay: 5,
-            tenant: "Demo Tenant",
+            tenant: "",
+          })),
+          ...Array.from({ length: 5 }).map((_, i) => ({
+            id: `S${i + 1}`,
+            type: "Shop",
+            name: `Shop ${i + 1}`,
+            floor: 0,
+            rent: 25000,
+            dueDay: 5,
+            tenant: "",
           })),
         ],
-        payments: [], 
-        expenses: [], 
+        payments: [], // {id, unitId, tenant, amount, forMonth, date, method, notes, receiptNo}
+        expenses: [], // {id, date, category, vendor, amount, notes}
       };
 
-      /* ------------- Cloud Storage Functions (UPDATED FOR AUTH) ------------- */
+      /* ------------- Cloud Storage Functions (UPDATED) ------------- */
+      const localStorageKey = "rental_erp_v1";
 
-      const loadData = async (userId) => {
-        const docRef = getUserDocRef(userId);
-        if (!docRef) {
-             console.error("Firestore not initialized or userId missing.");
-             return initialData;
-        }
-
+      const loadData = async () => {
         try {
+          // Check for old localStorage data for one-time migration
+          const rawLocal = localStorage.getItem(localStorageKey);
+          if (rawLocal) {
+            console.log("Found data in localStorage. Attempting cloud migration.");
+            const parsed = JSON.parse(rawLocal);
+            // Save it to Firestore immediately
+            await saveData(parsed);
+            // Clear local storage after successful migration
+            localStorage.removeItem(localStorageKey);
+            alert("Local data migrated to the cloud successfully! It will now sync across devices.");
+            return { ...initialData, ...parsed };
+          }
+
+          // Load from Firestore
+          const docRef = db.collection("erp_data").doc(FIRESTORE_DOC_ID);
           const doc = await docRef.get();
 
           if (doc.exists) {
-            console.log("Data loaded from user cloud storage.");
+            console.log("Data loaded from cloud storage.");
             return { ...initialData, ...doc.data() };
           }
 
-          console.log("No user cloud data found. Saving initial demo data.");
+          console.log("No cloud data found. Saving initial demo data to cloud.");
           // Initial save of demo data to the cloud
-          await saveData(initialData, userId);
+          await saveData(initialData);
           return initialData;
 
         } catch (e) {
           console.error("Cloud Load error. Returning initial data.", e);
+          alert("Error loading data from the cloud. Using initial demo data. Check your Firebase setup and internet connection.");
           return initialData;
         }
       };
 
-      const saveData = async (data, userId) => {
-        const docRef = getUserDocRef(userId);
-        if (!docRef) {
-             console.error("Firestore not initialized or userId missing. Cannot save.");
-             return;
-        }
-
+      const saveData = async (data) => {
         try {
+          const docRef = db.collection("erp_data").doc(FIRESTORE_DOC_ID);
           // Only save the user-mutable parts of the data object
           const dataToSave = {
             org: data.org,
@@ -198,87 +180,14 @@
             expenses: data.expenses,
           };
           await docRef.set(dataToSave);
-          console.log("Data saved to user cloud successfully.");
+          console.log("Data saved to cloud successfully.");
 
         } catch (e) {
           console.error("Cloud Save error.", e);
-          alert("Warning: Data failed to save to the cloud. Check your connection or Firebase rules.");
+          // You can also choose to save to localStorage as a backup here
+          alert("Warning: Data failed to save to the cloud. You are working offline and data will not sync.");
         }
       };
-      
-      /* ------------- NEW: Sign In Component ------------- */
-
-      function SignInPage({ auth, onAuthSuccess }) {
-        const [email, setEmail] = useState("");
-        const [password, setPassword] = useState("");
-        const [mode, setMode] = useState("login"); // 'login' or 'signup'
-        const [error, setError] = useState("");
-        const [isLoading, setIsLoading] = useState(false);
-
-        const handleSubmit = async (e) => {
-          e.preventDefault();
-          setError("");
-          setIsLoading(true);
-
-          try {
-            if (mode === 'login') {
-              await auth.signInWithEmailAndPassword(email, password);
-              // onAuthStateChanged listener in App handles navigation
-            } else {
-              await auth.createUserWithEmailAndPassword(email, password);
-              // onAuthStateChanged listener in App handles navigation
-            }
-          } catch (err) {
-            console.error(err);
-            setError(err.message || "An unknown error occurred during authentication.");
-          } finally {
-            setIsLoading(false);
-          }
-        };
-
-        return (
-          <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-            <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl space-y-6">
-              <h1 className="text-3xl font-bold text-center text-indigo-700">Mobile ERP Login</h1>
-              <p className="text-center text-slate-500">
-                {mode === 'login' ? 'Sign in to access your data.' : 'Create a new account.'}
-              </p>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <Input
-                  type="email"
-                  placeholder="Email Address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-                <Input
-                  type="password"
-                  placeholder="Password (min 6 characters)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-
-                {error && <div className="text-sm text-rose-600 bg-rose-50 p-3 rounded-xl border border-rose-200">{error}</div>}
-
-                <Button type="submit" className="w-full text-lg" disabled={isLoading}>
-                  {isLoading ? 'Processing...' : (mode === 'login' ? 'Log In' : 'Sign Up')}
-                </Button>
-              </form>
-
-              <div className="flex justify-center text-sm">
-                <Button variant="ghost" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
-                  {mode === 'login'
-                    ? "Need an account? Sign Up"
-                    : "Already have an account? Log In"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
 
       /* ------------- Small UI primitives (unchanged) ------------- */
       const Section = ({ title, right, children }) => (
@@ -306,7 +215,7 @@
         <select
           {...props}
           className={classNames(
-            "w-full rounded-xl border px-3 py-2 text-sm md:text-base bg-white",
+            "w-full rounded-XL border px-3 py-2 text-sm md:text-base",
             "focus:outline-none focus:ring-2 focus:ring-indigo-400",
             props.className
           )}
@@ -316,15 +225,15 @@
       const Button = ({ children, variant = "primary", className, ...rest }) => {
         const styles = {
           primary: "bg-indigo-600 text-white hover:bg-indigo-700",
-          secondary: "bg-slate-100 hover:bg-slate-200 text-slate-700",
+          secondary: "bg-slate-100 hover:bg-slate-200",
           danger: "bg-rose-600 text-white hover:bg-rose-700",
-          ghost: "bg-transparent text-indigo-600 hover:bg-indigo-50",
+          ghost: "bg-transparent hover:bg-slate-100",
         };
         return (
           <button
             {...rest}
             className={classNames(
-              "rounded-xl px-4 py-2 text-sm md:text-base transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
+              "rounded-xl px-4 py-2 text-sm md:text-base transition shadow-sm",
               styles[variant],
               className
             )}
@@ -333,80 +242,38 @@
           </button>
         );
       };
-      
+
       /* ------------- Main App (UPDATED) ------------- */
       function App() {
-        // Auth State
-        const [user, setUser] = useState(null); // Firebase User object
-        const [loadingAuth, setLoadingAuth] = useState(true);
-
-        // App Data State (only loaded when user is active)
-        const [data, setData] = useState(null); 
-        const [loadingData, setLoadingData] = useState(false);
+        const [data, setData] = useState(initialData);
         const [tab, setTab] = useState("dashboard");
         const [search, setSearch] = useState("");
         const [showReceipt, setShowReceipt] = useState(null); 
+        const [loading, setLoading] = useState(true); // NEW: Loading state
 
-        // 1. Authentication Listener (runs once on mount)
+        // 1. Initial data fetch from cloud
         useEffect(() => {
-            if (!auth) {
-                console.error("Firebase Auth not initialized.");
-                setLoadingAuth(false);
-                return;
-            }
-
-            // 1a. Handle Canvas initial auth token
-            if (initialAuthToken && loadingAuth) {
-                 auth.signInWithCustomToken(initialAuthToken)
-                    .then(() => console.log("Signed in with Canvas custom token."))
-                    .catch((error) => console.error("Custom token sign-in failed:", error))
-                    .finally(() => setLoadingAuth(false));
-            } else {
-                 setLoadingAuth(false);
-            }
-
-            // 1b. Listen for auth changes
-            const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-                setUser(currentUser);
-                setLoadingAuth(false); 
-                // When a user logs out, clear the app data
-                if (!currentUser) {
-                    setData(null);
-                }
+            loadData().then(initialData => {
+                setData(initialData);
+                setLoading(false);
             });
-
-            return () => unsubscribe();
         }, []);
 
 
-        // 2. Data Fetcher (runs when user changes)
-        useEffect(() => {
-            if (user) {
-                setLoadingData(true);
-                // Load data specific to the current user's UID
-                loadData(user.uid).then(initialData => {
-                    setData(initialData);
-                    setLoadingData(false);
-                }).catch(e => {
-                    console.error("Data load failed after login:", e);
-                    setData(initialData); // Fallback to demo data structure
-                    setLoadingData(false);
-                });
-            }
-        }, [user]);
-
-
-        // 3. Data Persistence (Debounced Cloud Save)
+        // 2. Data Persistence (Debounced Cloud Save)
+        // This replaces the simple useEffect(() => saveData(data), [data]);
         const saveTimeout = useRef(null);
         useEffect(() => {
-          if (!data || !user || loadingData) return; // Do not save if data not ready or user is missing
+          if (loading) return; // Do not save until initial load is complete
 
+          // Clear previous timeout to debounce the save operation
           if (saveTimeout.current) {
             clearTimeout(saveTimeout.current);
           }
 
+          // Set a new timeout to save data after a small delay (500ms)
           saveTimeout.current = setTimeout(() => {
-            saveData(data, user.uid);
+            saveData(data);
           }, 500); 
 
           return () => {
@@ -414,33 +281,42 @@
               clearTimeout(saveTimeout.current);
             }
           };
-        }, [data, user, loadingData]);
-
-        
-        const isLoading = loadingAuth || loadingData || !data;
-        const isAuthenticated = !!user && !!data;
+        }, [data, loading]);
 
 
-        // Render Sign In Page or Loading Screen
-        if (loadingAuth) {
-            return (
-              <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center bg-slate-50">
-                <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                <div className="text-xl font-semibold text-indigo-600 mt-4">Initializing Application...</div>
-                <div className="text-sm text-slate-500 mt-2">Checking user session.</div>
-              </div>
-            );
-        }
-
-        if (!isAuthenticated) {
-            return <SignInPage auth={auth} />;
-        }
-
-
-        // --- Main ERP Content ---
         const units = data.units;
         const payments = data.payments;
         const expenses = data.expenses;
+
+        const totals = useMemo(() => {
+          const income = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+          const expense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+          return { income, expense, net: income - expense };
+        }, [payments, expenses]);
+
+        const outstandingByUnit = useMemo(() => {
+          const now = new Date();
+          const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          const map = Object.fromEntries(units.map((u) => [u.id, u.rent || 0]));
+          payments
+            .filter((p) => (p.forMonth || "").startsWith(ym))
+            .forEach((p) => {
+              map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0);
+            });
+          return map; // positive means due
+        }, [units, payments]);
+
+        const filteredUnits = useMemo(() => {
+          if (!search) return units;
+          const q = search.toLowerCase();
+          return units.filter(
+            (u) =>
+              u.id.toLowerCase().includes(q) ||
+              u.name.toLowerCase().includes(q) ||
+              (u.tenant || "").toLowerCase().includes(q) ||
+              (u.type || "").toLowerCase().includes(q)
+          );
+        }, [units, search]);
 
         // Data helpers
         const updateOrg = (patch) => setData((d) => ({ ...d, org: { ...d.org, ...patch } }));
@@ -457,37 +333,6 @@
           setData((d) => ({ ...d, payments: [{ ...p, id: crypto.randomUUID() }, ...d.payments] }));
         const addExpense = (e) =>
           setData((d) => ({ ...d, expenses: [{ ...e, id: crypto.randomUUID() }, ...d.expenses] }));
-
-        const totals = useMemo(() => { /* ... (unchanged logic) ... */
-          const income = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-          const expense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-          return { income, expense, net: income - expense };
-        }, [payments, expenses]);
-
-        const outstandingByUnit = useMemo(() => { /* ... (unchanged logic) ... */
-          const now = new Date();
-          const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-          const map = Object.fromEntries(units.map((u) => [u.id, u.rent || 0]));
-          payments
-            .filter((p) => (p.forMonth || "").startsWith(ym))
-            .forEach((p) => {
-              map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0);
-            });
-          return map; 
-        }, [units, payments]);
-
-        const filteredUnits = useMemo(() => { /* ... (unchanged logic) ... */
-          if (!search) return units;
-          const q = search.toLowerCase();
-          return units.filter(
-            (u) =>
-              u.id.toLowerCase().includes(q) ||
-              u.name.toLowerCase().includes(q) ||
-              (u.tenant || "").toLowerCase().includes(q) ||
-              (u.type || "").toLowerCase().includes(q)
-          );
-        }, [units, search]);
-
 
         const exportData = () => download(`rental-erp-backup-${todayStr()}.json`, JSON.stringify(data, null, 2));
         const importData = (file) => {
@@ -521,24 +366,20 @@
           setData({ ...initialData });
         };
 
-        const handleLogout = () => {
-            auth.signOut().catch(e => console.error("Logout failed", e));
-        };
-
         return (
           <div className="min-h-screen bg-slate-50 text-slate-800">
-            {loadingData && (
+            {loading && (
+              // NEW: Simple loading screen
               <div className="fixed inset-0 bg-white/70 z-50 flex flex-col items-center justify-center p-8 text-center">
                 <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                <div className="text-xl font-semibold text-indigo-600 mt-4">Loading Data...</div>
-                <div className="text-sm text-slate-500 mt-2">Fetching data for User: {user.uid}</div>
+                <div className="text-xl font-semibold text-indigo-600 mt-4">Loading Data from Cloud...</div>
+                <div className="text-sm text-slate-500 mt-2">Connecting to Firebase to sync your data.</div>
               </div>
             )}
             <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
               <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-2">
                 <div className="text-xl md:text-2xl font-bold">🏢 {data.org.name}</div>
                 <div className="ml-auto flex items-center gap-2">
-                  <Button variant="secondary" onClick={handleLogout}>Log Out</Button>
                   <Button variant="secondary" onClick={exportData}>⤓ Export</Button>
                   <label className="cursor-pointer">
                     <span className="inline-block bg-slate-100 hover:bg-slate-200 rounded-xl px-4 py-2 text-sm">Import</span>
@@ -561,7 +402,7 @@
                       variant={tab === key ? "primary" : "secondary"}
                       className="w-full"
                       onClick={() => setTab(key)}
-                      disabled={isLoading}
+                      disabled={loading} // Disable buttons while loading
                     >
                       {label}
                     </Button>
@@ -628,10 +469,6 @@
           </div>
         );
       }
-      
-      /* --- All other components (DashboardSection, StatCard, UnitsTable, PaymentsTable, NewReceiptForm, ExpensesSection, OrgSettings, ReceiptModal, renderReceiptInner, renderReceiptHTML, escapeHTML) go here, unchanged from the previous version. --- */
-      // Due to space limitations, the auxiliary components are not repeated but should be included in the final file.
-      // Copy and paste them from the previous version below this line.
 
       /* ------------- Dashboard (unchanged) ------------- */
       function DashboardSection({ totals, units, outstandingByUnit, setTab }) {
@@ -745,7 +582,7 @@
                       <td className="p-3">
                         <div className="flex gap-2">
                           <Button variant="secondary" onClick={() => edit(u)}>Edit</Button>
-                          <Button variant="danger" onClick={() => { if (confirm(`Are you sure you want to delete unit ${u.name}?`)) deleteUnit(u.id); }}>Delete</Button>
+                          <Button variant="danger" onClick={() => deleteUnit(u.id)}>Delete</Button>
                         </div>
                       </td>
                     </tr>
@@ -1076,7 +913,7 @@
       function escapeHTML(str) {
         return String(str || "").replace(/[&<>'"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
       }
-      
+
       /* ------------- Mount app ------------- */
       const root = ReactDOM.createRoot(document.getElementById('root'));
       root.render(<App />);
