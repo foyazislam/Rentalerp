@@ -1,24 +1,51 @@
-<script type="text/babel">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mobile ERP — Single-File HTML (Cloud Sync)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+      html, body { height: 100%; background: #f1f5f9; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
       const { useEffect, useMemo, useRef, useState } = React;
+
       /* ------------- Firebase Setup (REPLACE THESE CONFIG VALUES) ------------- */
       // ⚠️ IMPORTANT: You must replace the placeholders below with your actual Firebase project configuration.
       const firebaseConfig = {
-  apiKey: "AIzaSyB21YCBgR4qJgRRunwWPx3tUeELvFegxnE",
+apiKey: "AIzaSyB21YCBgR4qJgRRunwWPx3tUeELvFegxnE",
   authDomain: "rentalerp-abe70.firebaseapp.com",
   projectId: "rentalerp-abe70",
   storageBucket: "rentalerp-abe70.firebasestorage.app",
   messagingSenderId: "400286046254",
   appId: "1:400286046254:web:50a278b1c0d97246b2a7bf"
 };
+
+  
       // Initialize Firebase App and Firestore
       if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
       }
       const db = firebase.firestore();
+      
       // The single document ID where all your application data will be stored.
-      const FIRESTORE_DOC_ID = "main_rental_data";
+      const FIRESTORE_DOC_ID = "main_rental_data"; 
+
       /* ------------- Utilities ------------- */
       const todayStr = () => new Date().toISOString().slice(0, 10);
+
       const currency = (n) => {
         const num = Number(n || 0);
         try {
@@ -36,12 +63,14 @@
         const d = new Date(dateStr);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; // YYYY-MM
       };
+
       const nextReceiptNo = (allPayments) => {
         const yyyymm = monthKey(new Date().toISOString());
         const prefix = `RC-${yyyymm}-`;
         const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1;
         return `${prefix}${String(count).padStart(4, "0")}`;
       };
+
       const download = (filename, text) => {
         const blob = new Blob([text], { type: "application/json;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
@@ -53,12 +82,12 @@
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       };
+
       const classNames = (...c) => c.filter(Boolean).join(" ");
 
       // crypto.randomUUID fallback for older Safari if needed
       if (!(window.crypto && window.crypto.randomUUID)) {
-        window.crypto = window.crypto ||
-{};
+        window.crypto = window.crypto || {};
         window.crypto.randomUUID = function () {
           // RFC4122 v4-ish
           return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -68,42 +97,6 @@
           });
         };
       }
-      
-      // NEW Utility function to check for reminder
-      const shouldShowReminder = (dueDay) => {
-          const today = new Date();
-          const currentDay = today.getDate();
-          
-          // Calculate the day that is 2 days before the dueDay
-          // Handle wrap-around from 1 to 31 (e.g., if dueDay is 3, reminder is on 1)
-          const reminderDay = (Number(dueDay) - 2 + 31) % 31; 
-          
-          // Special case: if dueDay is 1 or 2, reminderDay will be 30 or 31 (last days of the *previous* month).
-          // We assume a simple same-month calculation for simplicity in this React component.
-          // This check is accurate for dueDays 3 through 31.
-          
-          // Simplified check: is today the day 2 days before the dueDay?
-          // We use Math.abs because if dueDay is 5, we check for 3.
-          return Math.abs(currentDay - Number(dueDay)) === 2;
-      }
-      
-      // NEW Utility function to generate WhatsApp link
-      const createWhatsAppLink = (tenantPhone, unitName, orgName, dueDay, rentAmount) => {
-          if (!tenantPhone || !unitName) return null;
-          // Clean phone number (remove +, spaces, dashes, etc.)
-          const phone = tenantPhone.replace(/\D/g, ''); 
-          
-          // Format rent amount for the message
-          const rent = currency(rentAmount);
-          
-          const message = `*Rent Reminder from ${orgName}*\n\nDear tenant of ${unitName},\n\nThis is a friendly reminder that your monthly rent of ${rent} is due in 2 days (on the ${dueDay}th of the month).\n\nPlease make the payment before the due date. Thank you!`;
-
-          const encodedMessage = encodeURIComponent(message);
-          
-          // Standard WhatsApp link format
-          return `https://wa.me/${phone}?text=${encodedMessage}`;
-      };
-
 
       /* ------------- Demo initial data (unchanged) ------------- */
       const initialData = {
@@ -113,7 +106,6 @@
           phone: "+8801XXXXXXXXX",
           email: "owner@example.com",
           note: "Thank you for your payment!",
-     
         },
         units: [
           ...Array.from({ length: 10 }).map((_, i) => ({
@@ -121,38 +113,27 @@
             type: "Flat",
             name: `Flat ${i + 1}`,
             floor: Math.ceil((i + 1) / 2),
-           
             rent: 15000,
             dueDay: 5,
             tenant: "",
-            tenantPhone: "", // NEW: Tenant phone for WhatsApp
-            tenantPhotoUrl: "", // NEW: Tenant photo URL
-            tenantNidUrl: "", // NEW: Tenant NID URL
-            rentAgreementUrl: "", // NEW: Rent Agreement URL
-            enableReminder: true, // NEW: Reminder toggle
           })),
           ...Array.from({ length: 5 }).map((_, i) => ({
             id: `S${i + 1}`,
             type: "Shop",
             name: `Shop ${i + 1}`,
-  
             floor: 0,
             rent: 25000,
             dueDay: 5,
             tenant: "",
-            tenantPhone: "", // NEW: Tenant phone for WhatsApp
-            tenantPhotoUrl: "", // NEW: Tenant photo URL
-            tenantNidUrl: "", // NEW: Tenant NID URL
-            rentAgreementUrl: "", // NEW: Rent Agreement URL
-            enableReminder: true, // NEW: Reminder toggle
           })),
         ],
         payments: [], // {id, unitId, tenant, amount, forMonth, date, method, notes, receiptNo}
-        expenses: [], // {id, date, 
-category, vendor, amount, notes}
+        expenses: [], // {id, date, category, vendor, amount, notes}
       };
+
       /* ------------- Cloud Storage Functions (UPDATED) ------------- */
       const localStorageKey = "rental_erp_v1";
+
       const loadData = async () => {
         try {
           // Check for old localStorage data for one-time migration
@@ -174,8 +155,7 @@ category, vendor, amount, notes}
 
           if (doc.exists) {
             console.log("Data loaded from cloud storage.");
-            // Merge with initialData to ensure new fields (like enableReminder) are present
-            return { ...initialData, ...doc.data() }; 
+            return { ...initialData, ...doc.data() };
           }
 
           console.log("No cloud data found. Saving initial demo data to cloud.");
@@ -217,10 +197,10 @@ category, vendor, amount, notes}
             <h2 className="text-lg md:text-xl font-semibold">{title}</h2>
             {right}
           </div>
-       
-        {children}
+          {children}
         </div>
       );
+
       const Input = (props) => (
         <input
           {...props}
@@ -230,7 +210,6 @@ category, vendor, amount, notes}
             props.className
           )}
         />
-     
       );
 
       const Select = (props) => (
@@ -242,8 +221,7 @@ category, vendor, amount, notes}
             props.className
           )}
         />
-   
-        );
+      );
 
       const Button = ({ children, variant = "primary", className, ...rest }) => {
         const styles = {
@@ -260,22 +238,11 @@ category, vendor, amount, notes}
               styles[variant],
               className
             )}
-     
           >
             {children}
           </button>
         );
       };
-      
-      const Checkbox = (props) => ( // NEW Checkbox component
-        <div className="flex items-center">
-            <input type="checkbox" 
-                {...props}
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
-            />
-            {props.label && <label htmlFor={props.id} className="ml-2 text-sm text-slate-700">{props.label}</label>}
-        </div>
-      );
 
       /* ------------- Main App (UPDATED) ------------- */
       function App() {
@@ -283,8 +250,7 @@ category, vendor, amount, notes}
         const [tab, setTab] = useState("dashboard");
         const [search, setSearch] = useState("");
         const [showReceipt, setShowReceipt] = useState(null); 
-        const [loading, setLoading] = useState(true);
-        // NEW: Loading state
+        const [loading, setLoading] = useState(true); // NEW: Loading state
 
         // 1. Initial data fetch from cloud
         useEffect(() => {
@@ -293,6 +259,8 @@ category, vendor, amount, notes}
                 setLoading(false);
             });
         }, []);
+
+
         // 2. Data Persistence (Debounced Cloud Save)
         // This replaces the simple useEffect(() => saveData(data), [data]);
         const saveTimeout = useRef(null);
@@ -304,8 +272,7 @@ category, vendor, amount, notes}
             clearTimeout(saveTimeout.current);
           }
 
-          // Set a new timeout to save data after a small 
-delay (500ms)
+          // Set a new timeout to save data after a small delay (500ms)
           saveTimeout.current = setTimeout(() => {
             saveData(data);
           }, 500); 
@@ -314,7 +281,6 @@ delay (500ms)
             if (saveTimeout.current) {
               clearTimeout(saveTimeout.current);
             }
-        
           };
         }, [data, loading]);
 
@@ -322,13 +288,13 @@ delay (500ms)
         const units = data.units;
         const payments = data.payments;
         const expenses = data.expenses;
-        const org = data.org; // NEW: Make org data available
 
         const totals = useMemo(() => {
           const income = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
           const expense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
           return { income, expense, net: income - expense };
         }, [payments, expenses]);
+
         const outstandingByUnit = useMemo(() => {
           const now = new Date();
           const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -336,11 +302,11 @@ delay (500ms)
           payments
             .filter((p) => (p.forMonth || "").startsWith(ym))
             .forEach((p) => {
-       
-               map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0);
+              map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0);
             });
           return map; // positive means due
         }, [units, payments]);
+
         const filteredUnits = useMemo(() => {
           if (!search) return units;
           const q = search.toLowerCase();
@@ -348,27 +314,11 @@ delay (500ms)
             (u) =>
               u.id.toLowerCase().includes(q) ||
               u.name.toLowerCase().includes(q) ||
-              (u.tenant 
-|| "").toLowerCase().includes(q) ||
+              (u.tenant || "").toLowerCase().includes(q) ||
               (u.type || "").toLowerCase().includes(q)
           );
         }, [units, search]);
-        
-        // NEW: Units that need a reminder today
-        const unitsForReminder = useMemo(() => {
-            if (!org.name) return []; // Don't run if org name is missing
-            return units.filter(u => 
-                u.enableReminder && 
-                u.tenantPhone && 
-                u.rent > 0 && 
-                u.dueDay >= 1 && u.dueDay <= 31 &&
-                shouldShowReminder(u.dueDay)
-            ).map(u => ({
-                ...u,
-                whatsappLink: createWhatsAppLink(u.tenantPhone, u.name, org.name, u.dueDay, u.rent)
-            }));
-        }, [units, org]);
-        
+
         // Data helpers
         const updateOrg = (patch) => setData((d) => ({ ...d, org: { ...d.org, ...patch } }));
         const upsertUnit = (unit) =>
@@ -378,11 +328,13 @@ delay (500ms)
               ? d.units.map((x) => (x.id === unit.id ? { ...x, ...unit } : x))
               : [...d.units, unit],
           }));
+
         const deleteUnit = (id) => setData((d) => ({ ...d, units: d.units.filter((u) => u.id !== id) }));
         const addPayment = (p) =>
           setData((d) => ({ ...d, payments: [{ ...p, id: crypto.randomUUID() }, ...d.payments] }));
         const addExpense = (e) =>
           setData((d) => ({ ...d, expenses: [{ ...e, id: crypto.randomUUID() }, ...d.expenses] }));
+
         const exportData = () => download(`rental-erp-backup-${todayStr()}.json`, JSON.stringify(data, null, 2));
         const importData = (file) => {
           const reader = new FileReader();
@@ -397,85 +349,80 @@ delay (500ms)
           };
           reader.readAsText(file);
         };
+
         // Reset / data management actions for Settings
         const clearOrgFields = () =>
           setData((d) => ({ ...d, org: { name: "", address: "", phone: "", email: "", note: "" } }));
+
         const restoreDemoOrg = () =>
           setData((d) => ({ ...d, org: { ...initialData.org } }));
+
         const clearPayments = () =>
           setData((d) => ({ ...d, payments: [] }));
+
         const clearExpenses = () =>
           setData((d) => ({ ...d, expenses: [] }));
+
         const factoryReset = () => {
           setData({ ...initialData });
         };
+
         return (
           <div className="min-h-screen bg-slate-50 text-slate-800">
             {loading && (
               // NEW: Simple loading screen
               <div className="fixed inset-0 bg-white/70 z-50 flex flex-col items-center justify-center p-8 text-center">
                 <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-       
-                 <div className="text-xl font-semibold text-indigo-600 mt-4">Loading Data from Cloud...</div>
+                <div className="text-xl font-semibold text-indigo-600 mt-4">Loading Data from Cloud...</div>
                 <div className="text-sm text-slate-500 mt-2">Connecting to Firebase to sync your data.</div>
               </div>
             )}
             <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
-              <div 
-className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-2">
+              <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-2">
                 <div className="text-xl md:text-2xl font-bold">🏢 {data.org.name}</div>
                 <div className="ml-auto flex items-center gap-2">
                   <Button variant="secondary" onClick={exportData}>⤓ Export</Button>
                   <label className="cursor-pointer">
-              
-                      <span className="inline-block bg-slate-100 hover:bg-slate-200 rounded-xl px-4 py-2 text-sm">Import</span>
+                    <span className="inline-block bg-slate-100 hover:bg-slate-200 rounded-xl px-4 py-2 text-sm">Import</span>
                     <input className="hidden" type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} />
                   </label>
                 </div>
               </div>
-          
               <nav className="mx-auto max-w-6xl px-2 pb-3">
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
                   {[
                     ["dashboard", "Dashboard"],
                     ["units", "Units"],
-            
                     ["payments", "Payments"],
                     ["newReceipt", "New Receipt"],
                     ["expenses", "Expenses"],
                     ["settings", "Settings"],
                   ].map(([key, label]) => (
-      
                     <Button
                       key={key}
-                      variant={tab === key ?
-"primary" : "secondary"}
+                      variant={tab === key ? "primary" : "secondary"}
                       className="w-full"
                       onClick={() => setTab(key)}
                       disabled={loading} // Disable buttons while loading
                     >
-     
-                       {label}
+                      {label}
                     </Button>
                   ))}
                 </div>
               </nav>
             </header>
 
-   
-              <main className="mx-auto max-w-6xl p-4 space-y-4 md:space-y-6">
+            <main className="mx-auto max-w-6xl p-4 space-y-4 md:space-y-6">
               {tab === "dashboard" && (
-                <DashboardSection totals={totals} units={units} outstandingByUnit={outstandingByUnit} unitsForReminder={unitsForReminder} setTab={setTab} />
+                <DashboardSection totals={totals} units={units} outstandingByUnit={outstandingByUnit} setTab={setTab} />
               )}
 
               {tab === "units" && (
-               
                 <Section
                   title="Units (Flats & Shops)"
                   right={<Input placeholder="Search units/tenant…" value={search} onChange={(e) => setSearch(e.target.value)} />}
                 >
                   <UnitsTable units={filteredUnits} upsertUnit={upsertUnit} deleteUnit={deleteUnit} />
-               
                 </Section>
               )}
 
@@ -483,7 +430,6 @@ className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-2">
                 <Section title="Payments (tap a row for receipt)">
                   <PaymentsTable payments={payments} units={units} onRowClick={setShowReceipt} />
                 </Section>
-       
               )}
 
               {tab === "newReceipt" && (
@@ -492,29 +438,24 @@ className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-2">
                 </Section>
               )}
 
-    
-               {tab === "expenses" && (
+              {tab === "expenses" && (
                 <Section title="Expenses">
                   <ExpensesSection expenses={expenses} addExpense={addExpense} />
                 </Section>
               )}
 
-              {tab === "settings" && 
-              (
+              {tab === "settings" && (
                 <Section title="Organization Settings">
                   <OrgSettings
                     org={data.org}
                     updateOrg={updateOrg}
                     clearOrgFields={clearOrgFields}
-    
                     restoreDemoOrg={restoreDemoOrg}
-                    clearPayments={() => { if (confirm("Clear ALL payments?
-This will remove every receipt.")) clearPayments(); }}
+                    clearPayments={() => { if (confirm("Clear ALL payments? This will remove every receipt.")) clearPayments(); }}
                     clearExpenses={() => { if (confirm("Clear ALL expenses?")) clearExpenses(); }}
                     factoryReset={() => { if (confirm("Factory Reset EVERYTHING? Units, payments, expenses and org will reset to demo.")) factoryReset(); }}
                   />
-           
-              </Section>
+                </Section>
               )}
             </main>
 
@@ -522,7 +463,6 @@ This will remove every receipt.")) clearPayments(); }}
               <ReceiptModal
                 org={data.org}
                 payment={showReceipt}
-         
                 unit={units.find((u) => u.id === showReceipt.unitId)}
                 onClose={() => setShowReceipt(null)}
               />
@@ -531,50 +471,21 @@ This will remove every receipt.")) clearPayments(); }}
         );
       }
 
-      /* ------------- Dashboard (MODIFIED) ------------- */
-      function DashboardSection({ totals, units, 
-outstandingByUnit, unitsForReminder, setTab }) {
+      /* ------------- Dashboard (unchanged) ------------- */
+      function DashboardSection({ totals, units, outstandingByUnit, setTab }) {
         const totalDue = Object.values(outstandingByUnit).reduce((s, v) => s + Math.max(0, v), 0);
-        
-        const unitsWithTenant = units.filter(u => u.tenant);
-        const vacancyRate = units.length > 0 ? (1 - (unitsWithTenant.length / units.length)) * 100 : 0;
 
         return (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             <StatCard label="Income" value={currency(totals.income)} />
             <StatCard label="Expenses" value={currency(totals.expense)} />
             <StatCard label="Net" value={currency(totals.net)} />
-          
             <StatCard label="This Month Due" value={currency(totalDue)} />
-            
-            {/* NEW: Reminder card */}
-            {unitsForReminder.length > 0 && (
-                <div className="col-span-2 md:col-span-4">
-                    <Section title="⚠️ Rent Reminder Needed Today">
-                        <div className="space-y-2">
-                            {unitsForReminder.map(u => (
-                                <div key={u.id} className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 p-3">
-                                    <div className="font-medium">{u.name} (Due: {u.dueDay}th)</div>
-                                    <a href={u.whatsappLink} target="_blank" rel="noopener noreferrer">
-                                        <Button variant="primary" className="text-sm">
-                                            Send WhatsApp to {u.tenant}
-                                        </Button>
-                                    </a>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="text-xs text-slate-500 mt-2">These units are 2 days from their due date and have reminders enabled.</div>
-                    </Section>
-                </div>
-            )}
-            
-            {/* End of NEW: Reminder card */}
 
             <div className="col-span-2 md:col-span-4">
               <Section title="Quick Actions" right={<div />}> 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <Button className="w-full" onClick={() => setTab("newReceipt")}>New Receipt</Button>
-                 
                   <Button variant="secondary" className="w-full" onClick={() => setTab("payments")}>View Payments</Button>
                   <Button variant="secondary" className="w-full" onClick={() => setTab("units")}>Manage Units</Button>
                   <Button variant="secondary" className="w-full" onClick={() => setTab("expenses")}>Add Expense</Button>
@@ -582,22 +493,18 @@ outstandingByUnit, unitsForReminder, setTab }) {
               </Section>
             </div>
 
-   
             <div className="col-span-2 md:col-span-4">
               <Section title="Current Month Dues by Unit">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {units.map((u) => (
                     <div key={u.id} className="flex items-center justify-between rounded-xl border p-3">
-   
-                       <div>
+                      <div>
                         <div className="font-medium">{u.name} <span className="text-xs text-slate-500">({u.type})</span></div>
-                        <div className="text-xs text-slate-500">Tenant: {u.tenant ||
-"—"}</div>
+                        <div className="text-xs text-slate-500">Tenant: {u.tenant || "—"}</div>
                       </div>
                       <div className={classNames("text-right font-semibold", (outstandingByUnit[u.id] || 0) > 0 ? "text-rose-600" : "text-emerald-600")}>{currency(Math.max(0, outstandingByUnit[u.id] || 0))}</div>
                     </div>
                   ))}
-    
                 </div>
               </Section>
             </div>
@@ -613,76 +520,41 @@ outstandingByUnit, unitsForReminder, setTab }) {
           </div>
         );
       }
-      /* ------------- Units (MODIFIED) ------------- */
+/* ------------- Units (unchanged) ------------- */
       function UnitsTable({ units, upsertUnit, deleteUnit }) {
-        const [form, setForm] = useState({ type: "Flat", rent: 15000, dueDay: 5, enableReminder: true });
-        const edit = (u) => setForm({ 
-            ...u,
-            // Ensure boolean state for checkbox
-            enableReminder: u.enableReminder !== undefined ? u.enableReminder : true 
-        });
-        const reset = () => setForm({ type: "Flat", rent: 15000, dueDay: 5, enableReminder: true });
+        const [form, setForm] = useState({ type: "Flat", rent: 15000, dueDay: 5 });
+
+        const edit = (u) => setForm({ ...u });
+        const reset = () => setForm({ type: "Flat", rent: 15000, dueDay: 5 });
+
         const submit = () => {
           if (!form.id || !form.name) return alert("Please fill ID and Name");
-          upsertUnit({ 
-              ...form, 
-              rent: Number(form.rent || 0), 
-              dueDay: Number(form.dueDay || 1) 
-          });
+          upsertUnit({ ...form, rent: Number(form.rent || 0), dueDay: Number(form.dueDay || 1) });
           reset();
         };
-        
-        // NEW: Function to toggle profile view
-        const [showProfileId, setShowProfileId] = useState(null);
-        const profileUnit = units.find(u => u.id === showProfileId);
-        
+
         return (
           <div className="grid md:grid-cols-3 gap-3 md:gap-4">
             <div className="md:col-span-1 bg-slate-50 border rounded-2xl p-3 space-y-2">
               <div className="font-semibold">Add / Edit Unit</div>
               <div className="grid gap-2">
                 <div className="grid grid-cols-2 gap-2">
-              
                   <Input placeholder="Unit ID (e.g., F1)" value={form.id || ""} onChange={(e) => setForm({ ...form, id: e.target.value })} />
                   <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                     <option>Flat</option>
                     <option>Shop</option>
-               
                   </Select>
                 </div>
                 <Input placeholder="Name" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                 <Input type="number" placeholder="Floor" value={form.floor ?? ""} onChange={(e) => setForm({ ...form, floor: Number(e.target.value) })} />
-                <Input type="number" placeholder="Monthly Rent" value={form.rent ??
-""} onChange={(e) => setForm({ ...form, rent: e.target.value })} />
-                <Input type="number" placeholder="Due Day (1-28)" value={form.dueDay ??
-""} onChange={(e) => setForm({ ...form, dueDay: e.target.value })} />
-                <Input placeholder="Tenant Name" value={form.tenant ||
-""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
-                <Input placeholder="Tenant Phone (for WhatsApp)" value={form.tenantPhone ||
-""} onChange={(e) => setForm({ ...form, tenantPhone: e.target.value })} />
-                
-                {/* NEW: Reminder Toggle */}
-                <Checkbox 
-                    id="enableReminder"
-                    label="Enable 2-day Rent Reminder (WhatsApp)"
-                    checked={form.enableReminder}
-                    onChange={(e) => setForm({ ...form, enableReminder: e.target.checked })}
-                />
-                
-                <hr className="my-2 border-slate-200" />
-                
-                {/* NEW: Profile/Document Links */}
-                <div className="font-medium text-sm">Tenant Documents (URLs)</div>
-                <Input placeholder="Tenant Photo URL" value={form.tenantPhotoUrl || ""} onChange={(e) => setForm({ ...form, tenantPhotoUrl: e.target.value })} />
-                <Input placeholder="NID Scan/Photo URL" value={form.tenantNidUrl || ""} onChange={(e) => setForm({ ...form, tenantNidUrl: e.target.value })} />
-                <Input placeholder="Rent Agreement URL" value={form.rentAgreementUrl || ""} onChange={(e) => setForm({ ...form, rentAgreementUrl: e.target.value })} />
-                {/* End NEW */}
+                <Input type="number" placeholder="Monthly Rent" value={form.rent ?? ""} onChange={(e) => setForm({ ...form, rent: e.target.value })} />
+                <Input type="number" placeholder="Due Day (1-28)" value={form.dueDay ?? ""} onChange={(e) => setForm({ ...form, dueDay: e.target.value })} />
+                <Input placeholder="Tenant Name" value={form.tenant || ""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
               </div>
               <div className="flex gap-2 mt-2">
                 <Button onClick={submit}>Save</Button>
                 <Button variant="secondary" onClick={reset}>Clear</Button>
               </div>
-            
             </div>
 
             <div className="md:col-span-2 overflow-auto rounded-2xl border">
@@ -690,121 +562,38 @@ outstandingByUnit, unitsForReminder, setTab }) {
                 <thead className="bg-slate-100 text-slate-600">
                   <tr>
                     <th className="p-3 text-left">ID</th>
-          
                     <th className="p-3 text-left">Name</th>
                     <th className="p-3">Type</th>
                     <th className="p-3 text-right">Rent</th>
                     <th className="p-3">Due Day</th>
                     <th className="p-3">Tenant</th>
-  
-                    <th className="p-3 text-center">Actions</th>
+                    <th className="p-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {units.map((u) => (
-           
                     <tr key={u.id} className="border-t">
                       <td className="p-3">{u.id}</td>
                       <td className="p-3">{u.name}</td>
                       <td className="p-3 text-center">{u.type}</td>
-                   
                       <td className="p-3 text-right">{currency(u.rent)}</td>
                       <td className="p-3 text-center">{u.dueDay}</td>
-                      <td className="p-3">{u.tenant ||
-"—"}</td>
+                      <td className="p-3">{u.tenant || "—"}</td>
                       <td className="p-3">
-                        <div className="flex gap-2 justify-center">
+                        <div className="flex gap-2">
                           <Button variant="secondary" onClick={() => edit(u)}>Edit</Button>
-                          {/* NEW: Profile Button */}
-                          <Button variant="secondary" onClick={() => setShowProfileId(u.id)}>Profile</Button> 
                           <Button variant="danger" onClick={() => deleteUnit(u.id)}>Delete</Button>
                         </div>
                       </td>
                     </tr>
                   ))}
-       
                 </tbody>
               </table>
             </div>
-            
-            {/* NEW: Tenant Profile Modal */}
-            {profileUnit && (
-                <TenantProfileModal 
-                    unit={profileUnit} 
-                    onClose={() => setShowProfileId(null)} 
-                />
-            )}
-            {/* End NEW: Tenant Profile Modal */}
-            
           </div>
         );
       }
        
-      /* ------------- Tenant Profile Modal (NEW) ------------- */
-      function TenantProfileModal({ unit, onClose }) {
-          return (
-            <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-0 md:p-6">
-                <div className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl shadow-xl">
-                    <div className="p-3 border-b flex items-center justify-between">
-                        <div className="font-semibold">Tenant Profile: {unit.name}</div>
-                        <Button variant="danger" onClick={onClose}>Close</Button>
-                    </div>
-                    <div className="p-4 space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <h3 className="text-lg font-semibold mb-2">Tenant Information</h3>
-                                <div className="space-y-1 text-sm">
-                                    <p><span className="font-medium text-slate-500">Tenant Name:</span> {unit.tenant || '—'}</p>
-                                    <p><span className="font-medium text-slate-500">Unit ID/Name:</span> {unit.id} / {unit.name}</p>
-                                    <p><span className="font-medium text-slate-500">Monthly Rent:</span> {currency(unit.rent)}</p>
-                                    <p><span className="font-medium text-slate-500">Due Day:</span> {unit.dueDay}</p>
-                                    <p><span className="font-medium text-slate-500">Phone:</span> {unit.tenantPhone || '—'}</p>
-                                    <p><span className="font-medium text-slate-500">Reminder:</span> {unit.enableReminder ? 'Enabled' : 'Disabled'}</p>
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <h3 className="text-lg font-semibold mb-2">Documents (Links)</h3>
-                                <DocumentLink label="Tenant Photo" url={unit.tenantPhotoUrl} />
-                                <DocumentLink label="NID Scan" url={unit.tenantNidUrl} />
-                                <DocumentLink label="Rent Agreement" url={unit.rentAgreementUrl} />
-                                <div className="text-xs text-slate-500 pt-2">Note: Files are stored as URLs. Click to view.</div>
-                            </div>
-                        </div>
-                        
-                        <div className="pt-4">
-                             {/* Display photo if URL exists */}
-                            {unit.tenantPhotoUrl && (
-                                <div className="space-y-2">
-                                    <h3 className="text-lg font-semibold">Tenant Photo Preview</h3>
-                                    <img 
-                                        src={unit.tenantPhotoUrl} 
-                                        alt="Tenant Photo" 
-                                        className="max-w-full h-auto rounded-xl shadow-lg border object-cover" 
-                                        style={{ maxHeight: '300px' }}
-                                        onError={(e) => { e.target.onerror = null; e.target.src="https://via.placeholder.com/300?text=Image+Load+Failed" }}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-          );
-      }
-      
-      function DocumentLink({ label, url }) {
-          if (!url) {
-              return <p className="text-sm"><span className="font-medium text-slate-500">{label}:</span> No URL provided</p>;
-          }
-          
-          return (
-              <p className="text-sm">
-                  <span className="font-medium text-slate-500">{label}:</span> 
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 underline ml-2 break-all">View Document</a>
-              </p>
-          );
-      }
-
 
       /* ------------- Payments (unchanged) ------------- */
       function PaymentsTable({ payments, units, onRowClick }) {
@@ -818,32 +607,29 @@ outstandingByUnit, unitsForReminder, setTab }) {
           const okM = !month || p.forMonth.startsWith(month);
           return okQ && okM;
         });
+
         return (
           <div className="space-y-3">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-start">
               <Input placeholder="Search receipt/tenant/unit…" value={q} onChange={(e) => setQ(e.target.value)} />
               <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
               <div className="md:col-span-3 flex gap-2">
-             
                 <Button variant="secondary" onClick={() => { setQ(""); setMonth(""); }}>Reset Filters</Button>
               </div>
             </div>
             <div className="overflow-auto rounded-2xl border">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 text-slate-600">
-              
-                <tr>
+                  <tr>
                     <th className="p-3 text-left">Date</th>
                     <th className="p-3">Receipt #</th>
                     <th className="p-3">Unit</th>
                     <th className="p-3 text-left">Tenant</th>
-         
                     <th className="p-3 text-right">Amount</th>
                     <th className="p-3">For Month</th>
                     <th className="p-3">Method</th>
                   </tr>
                 </thead>
-          
                 <tbody>
                   {list.map((p) => {
                     const unit = units.find((u) => u.id === p.unitId);
@@ -851,12 +637,10 @@ outstandingByUnit, unitsForReminder, setTab }) {
                       <tr key={p.id} className="border-t hover:bg-indigo-50 cursor-pointer" onClick={() => onRowClick(p)}>
                         <td className="p-3">{p.date}</td>
                         <td className="p-3 text-center font-medium">{p.receiptNo}</td>
-                  
                         <td className="p-3 text-center">{unit?.name || p.unitId}</td>
                         <td className="p-3">{p.tenant}</td>
                         <td className="p-3 text-right font-semibold">{currency(p.amount)}</td>
                         <td className="p-3 text-center">{p.forMonth}</td>
-            
                         <td className="p-3 text-center">{p.method}</td>
                       </tr>
                     );
@@ -870,20 +654,14 @@ outstandingByUnit, unitsForReminder, setTab }) {
 
       function NewReceiptForm({ units, addPayment, data }) {
         const [form, setForm] = useState({ date: todayStr(), method: "Cash" });
-        
-        // Update form state when a unit is selected (to pre-fill tenant name)
-        useEffect(() => {
-            const unit = units.find((u) => u.id === form.unitId);
-            if (unit) {
-                setForm((f) => ({ ...f, tenant: unit.tenant || "" }));
-            }
-        }, [form.unitId, units]);
-        
+
         useEffect(() => {
           if (!form.receiptNo) setForm((f) => ({ ...f, receiptNo: nextReceiptNo(data.payments) }));
         }, []);
+
         const resetForm = () =>
           setForm({ date: todayStr(), method: "Cash", receiptNo: nextReceiptNo(data.payments) });
+
         const submit = () => {
           if (!form.unitId || !form.tenant || !form.amount || !form.forMonth) {
             return alert("Please fill Unit, Tenant, Amount and For Month.");
@@ -892,6 +670,7 @@ outstandingByUnit, unitsForReminder, setTab }) {
           alert(`Receipt ${form.receiptNo} created ✅`);
           setForm({ date: todayStr(), method: form.method, receiptNo: nextReceiptNo([...data.payments, form]) });
         };
+
         const unit = units.find((u) => u.id === form.unitId);
 
         return (
@@ -899,54 +678,44 @@ outstandingByUnit, unitsForReminder, setTab }) {
             <div className="md:col-span-2 bg-slate-50 border rounded-2xl p-3 space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <Select value={form.unitId || ""} onChange={(e) => setForm({ ...form, unitId: e.target.value })}>
-                
                   <option value="">Select Unit…</option>
                   {units.map((u) => (
                     <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
                   ))}
                 </Select>
-                <Input placeholder="Tenant Name" 
-value={form.tenant || (unit?.tenant || "")} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
+                <Input placeholder="Tenant Name" value={form.tenant || (unit?.tenant || "")} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-                <Input type="month" placeholder="For Month" value={form.forMonth ||
-""} onChange={(e) => setForm({ ...form, forMonth: e.target.value })} />
+                <Input type="month" placeholder="For Month" value={form.forMonth || ""} onChange={(e) => setForm({ ...form, forMonth: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
                 <Select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
-           
-                   <option>Cash</option>
+                  <option>Cash</option>
                   <option>Bank</option>
                   <option>Bkash</option>
                   <option>Nagad</option>
                   <option>Card</option>
                 </Select>
-     
               </div>
-              <Input placeholder="Notes (optional)" value={form.notes ||
-""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-              <div className="text-xs text-slate-500">Auto Receipt #: <span className="font-medium text-slate-700">{form.receiptNo ||
-"(will generate)"}</span></div>
+              <Input placeholder="Notes (optional)" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              <div className="text-xs text-slate-500">Auto Receipt #: <span className="font-medium text-slate-700">{form.receiptNo || "(will generate)"}</span></div>
               <div className="flex gap-2">
                 <Button onClick={submit}>Save Receipt</Button>
                 <Button variant="secondary" onClick={resetForm}>Reset Form</Button>
                 <Button variant="secondary" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Back to Top</Button>
               </div>
-     
             </div>
 
             <div className="md:col-span-1 border rounded-2xl p-3 space-y-2">
               <div className="font-semibold">Unit Details</div>
-              {unit ?
-(
+              {unit ? (
                 <div className="text-sm space-y-1">
                   <div><span className="text-slate-500">Name:</span> {unit.name}</div>
                   <div><span className="text-slate-500">Type:</span> {unit.type}</div>
                   <div><span className="text-slate-500">Rent:</span> {currency(unit.rent)}</div>
-                  <div><span className="text-slate-500">Tenant:</span> {unit.tenant || 
-"—"}</div>
+                  <div><span className="text-slate-500">Tenant:</span> {unit.tenant || "—"}</div>
                 </div>
               ) : (
                 <div className="text-sm text-slate-500">Select a unit to preview details.</div>
@@ -959,6 +728,7 @@ value={form.tenant || (unit?.tenant || "")} onChange={(e) => setForm({ ...form, 
       /* ------------- Expenses (unchanged) ------------- */
       function ExpensesSection({ expenses, addExpense }) {
         const [form, setForm] = useState({ date: todayStr() });
+
         const resetForm = () => setForm({ date: todayStr() });
 
         const submit = () => {
@@ -972,12 +742,10 @@ value={form.tenant || (unit?.tenant || "")} onChange={(e) => setForm({ ...form, 
             <div className="md:col-span-1 bg-slate-50 border rounded-2xl p-3 space-y-2">
               <div className="font-semibold">Add Expense</div>
               <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-              <Input placeholder="Category (e.g., Maintenance)" 
-value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+              <Input placeholder="Category (e.g., Maintenance)" value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} />
               <Input placeholder="Vendor/Payee" value={form.vendor || ""} onChange={(e) => setForm({ ...form, vendor: e.target.value })} />
               <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
               <Input placeholder="Notes" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          
               <div className="flex gap-2">
                 <Button onClick={submit}>Save Expense</Button>
                 <Button variant="secondary" onClick={resetForm}>Reset Form</Button>
@@ -985,30 +753,24 @@ value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.targ
             </div>
 
             <div className="md:col-span-2 overflow-auto rounded-2xl border">
-              <table 
-className="min-w-full text-sm">
+              <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 text-slate-600">
                   <tr>
                     <th className="p-3 text-left">Date</th>
                     <th className="p-3 text-left">Category</th>
-                   
                     <th className="p-3 text-left">Vendor</th>
                     <th className="p-3 text-right">Amount</th>
                     <th className="p-3 text-left">Notes</th>
                   </tr>
                 </thead>
                 <tbody>
-   
-                {expenses.map((e) => (
+                  {expenses.map((e) => (
                     <tr key={e.id} className="border-t">
                       <td className="p-3">{e.date}</td>
                       <td className="p-3">{e.category}</td>
-               
-                        <td className="p-3">{e.vendor ||
-"—"}</td>
+                      <td className="p-3">{e.vendor || "—"}</td>
                       <td className="p-3 text-right">{currency(e.amount)}</td>
-                      <td className="p-3">{e.notes ||
-""}</td>
+                      <td className="p-3">{e.notes || ""}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1024,13 +786,11 @@ className="min-w-full text-sm">
           <div className="grid md:grid-cols-2 gap-3 md:gap-4">
             <div className="space-y-2">
               <div className="text-sm text-slate-500">Organization / Landlord Info</div>
-              <Input placeholder="Name" value={org.name} onChange={(e) 
-=> updateOrg({ name: e.target.value })} />
+              <Input placeholder="Name" value={org.name} onChange={(e) => updateOrg({ name: e.target.value })} />
               <Input placeholder="Address" value={org.address} onChange={(e) => updateOrg({ address: e.target.value })} />
               <Input placeholder="Phone" value={org.phone} onChange={(e) => updateOrg({ phone: e.target.value })} />
               <Input placeholder="Email" value={org.email} onChange={(e) => updateOrg({ email: e.target.value })} />
               <Input placeholder="Receipt Footer Note" value={org.note} onChange={(e) => updateOrg({ note: e.target.value })} />
- 
               <div className="flex gap-2 pt-1">
                 <Button variant="secondary" onClick={clearOrgFields}>Reset Org Fields</Button>
                 <Button variant="secondary" onClick={restoreDemoOrg}>Restore Demo Org</Button>
@@ -1038,21 +798,17 @@ className="min-w-full text-sm">
             </div>
 
             <div className="space-y-3 bg-slate-50 border rounded-2xl p-3">
- 
               <div className="text-sm text-slate-500">Data Management / Reset</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <Button variant="danger" onClick={clearPayments}>Clear ALL Payments</Button>
                 <Button variant="danger" onClick={clearExpenses}>Clear ALL Expenses</Button>
                 <Button variant="danger" onClick={factoryReset}>Factory Reset (Everything)</Button>
-    
               </div>
               <div className="text-xs text-slate-500">
-                • Clearing payments removes all receipts.
-<br/>
-                • Clearing expenses removes all expense entries.
-<br/>
+                • Clearing payments removes all receipts. <br/>
+                • Clearing expenses removes all expense entries. <br/>
                 • Factory reset restores demo units and org, and wipes payments & expenses.
-</div>
+              </div>
             </div>
           </div>
         );
@@ -1061,6 +817,7 @@ className="min-w-full text-sm">
       /* ------------- Receipt Modal (printable) (unchanged) ------------- */
       function ReceiptModal({ org, payment, unit, onClose }) {
         const ref = useRef();
+
         const printNow = () => {
           const w = window.open("", "_blank");
           const html = renderReceiptHTML(org, payment, unit);
@@ -1069,20 +826,19 @@ className="min-w-full text-sm">
           w.focus();
           w.print();
         };
+
         return (
           <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-0 md:p-6">
             <div ref={ref} className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl shadow-xl">
               <div className="p-3 border-b flex items-center justify-between">
                 <div className="font-semibold">Receipt Preview</div>
                 <div className="flex gap-2">
-     
-                   <Button variant="secondary" onClick={printNow}>Print</Button>
+                  <Button variant="secondary" onClick={printNow}>Print</Button>
                   <Button variant="danger" onClick={onClose}>Close</Button>
                 </div>
               </div>
               <div className="p-4 bg-slate-50">
-                <div className="bg-white border 
-rounded-xl p-4" dangerouslySetInnerHTML={{ __html: renderReceiptInner(org, payment, unit) }} />
+                <div className="bg-white border rounded-xl p-4" dangerouslySetInnerHTML={{ __html: renderReceiptInner(org, payment, unit) }} />
               </div>
             </div>
           </div>
@@ -1095,50 +851,39 @@ rounded-xl p-4" dangerouslySetInnerHTML={{ __html: renderReceiptInner(org, payme
             <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
               <div>
                 <div style="font-size:20px; font-weight:700;">${escapeHTML(org.name)}</div>
-               
                 <div style="font-size:12px; color:#334155;">${escapeHTML(org.address)}</div>
-                <div style="font-size:12px; color:#334155;">Phone: ${escapeHTML(org.phone)} |
-Email: ${escapeHTML(org.email)}</div>
+                <div style="font-size:12px; color:#334155;">Phone: ${escapeHTML(org.phone)} | Email: ${escapeHTML(org.email)}</div>
               </div>
               <div style="text-align:right; font-size:12px; color:#334155;">
                 <div><b>Receipt #</b>: ${escapeHTML(payment.receiptNo)}</div>
                 <div><b>Date</b>: ${escapeHTML(payment.date)}</div>
               </div>
             </div>
-       
-            <hr style="margin:12px 0; border:none; border-top:1px dashed #cbd5e1;"
-/>
+            <hr style="margin:12px 0; border:none; border-top:1px dashed #cbd5e1;" />
             <div style="font-size:14px; margin-bottom:8px;"><b>Received From:</b> ${escapeHTML(payment.tenant)}</div>
             <table style="width:100%; font-size:14px; border-collapse:collapse;">
               <thead>
                 <tr>
                   <th style="text-align:left; padding:8px; background:#f1f5f9;">Unit</th>
-                  
                   <th style="text-align:left; padding:8px; background:#f1f5f9;">For Month</th>
                   <th style="text-align:center; padding:8px; background:#f1f5f9;">Method</th>
                   <th style="text-align:right; padding:8px; background:#f1f5f9;">Amount</th>
                 </tr>
               </thead>
               <tbody>
-          
                 <tr>
                   <td style="padding:8px; border-top:1px solid #e2e8f0;">${escapeHTML(unit?.name || payment.unitId)}</td>
                   <td style="padding:8px; border-top:1px solid #e2e8f0;">${escapeHTML(payment.forMonth)}</td>
                   <td style="padding:8px; text-align:center; border-top:1px solid #e2e8f0;">${escapeHTML(payment.method)}</td>
-                  <td style="padding:8px;
-text-align:right; border-top:1px solid #e2e8f0;"><b>${currency(payment.amount)}</b></td>
+                  <td style="padding:8px; text-align:right; border-top:1px solid #e2e8f0;"><b>${currency(payment.amount)}</b></td>
                 </tr>
               </tbody>
             </table>
-            ${payment.notes ? `<div style="margin-top:8px;
-font-size:12px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""}
-            <div style="margin-top:24px; display:flex; justify-content:space-between;
-align-items:center;">
-              <div style="font-size:12px;
-color:#334155;">${escapeHTML(org.note || "")}</div>
+            ${payment.notes ? `<div style="margin-top:8px; font-size:12px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""}
+            <div style="margin-top:24px; display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:12px; color:#334155;">${escapeHTML(org.note || "")}</div>
               <div style="text-align:center;">
-                <div style="border-top:1px solid #94a3b8;
-padding-top:6px; font-size:12px;">Authorized Signature</div>
+                <div style="border-top:1px solid #94a3b8; padding-top:6px; font-size:12px;">Authorized Signature</div>
               </div>
             </div>
           </div>
@@ -1149,16 +894,14 @@ padding-top:6px; font-size:12px;">Authorized Signature</div>
         return `<!DOCTYPE html>
         <html>
         <head>
-          <meta charset="utf-8" 
-/>
+          <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <title>${escapeHTML(org.name)} — Receipt ${escapeHTML(payment.receiptNo)}</title>
           <style>
             @media print {
               @page { size: A4; margin: 16mm; }
             }
-            body { background:#f8fafc; margin:0; padding:16px; 
-}
+            body { background:#f8fafc; margin:0; padding:16px; }
             .sheet { background:white; padding:16px; border:1px solid #e2e8f0; border-radius:12px; }
           </style>
         </head>
@@ -1169,11 +912,12 @@ padding-top:6px; font-size:12px;">Authorized Signature</div>
       }
 
       function escapeHTML(str) {
-        return String(str || 
-"").replace(/[&<>'"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
+        return String(str || "").replace(/[&<>'"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
       }
 
       /* ------------- Mount app ------------- */
       const root = ReactDOM.createRoot(document.getElementById('root'));
       root.render(<App />);
     </script>
+  </body>
+</html>
