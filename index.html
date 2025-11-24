@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mobile ERP — Single-File HTML (Koder Test Mode)</title>
+    <title>Mobile ERP — Single-File HTML (Firebase Auth Enabled)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -24,132 +24,130 @@
 
     <script type="text/babel">
       const { useEffect, useMemo, useRef, useState } = React;
- /* ------------- Firebase Setup (REPLACE THESE CONFIG VALUES) ------------- */
+ 
+ /* ------------------- Firebase Setup (REPLACE THESE CONFIG VALUES) ------------------- */
       // ⚠️ IMPORTANT: You must replace the placeholders below with your actual Firebase project configuration.
- const firebaseConfig = {
-        apiKey: "AIzaSyB21YCBgR4qJgRRunwWPx3tUeELvFegxnE",
-        authDomain: "rentalerp-abe70.firebaseapp.com",
-        projectId: "rentalerp-abe70",
-        storageBucket: "rentalerp-abe70.firebasestorage.app",
-        messagingSenderId: "400286046254",
-        appId: "1:400286046254:web:50a278b1c0d97246b2a7bf"
+      const firebaseConfig = {
+        apiKey: "AIzaSyB21YCBgR4qJgRRunwWPx3tUeELvFegxnE", // REPLACE THIS
+        authDomain: "rentalerp-abe70.firebaseapp.com", // REPLACE THIS
+        projectId: "rentalerp-abe70", // REPLACE THIS
+        storageBucket: "rentalerp-abe70.firebasestorage.app", // REPLACE THIS
+        messagingSenderId: "400286046254", // REPLACE THIS
+        appId: "1:400286046254:web:50a278b1c0d97246b2a7bf" // REPLACE THIS
       };
- // Initialize Firebase App, Firestore, Auth, and Storage
+ 
+      // Initialize Firebase App, Firestore, Auth, and Storage
       if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
- }
+      }
       const db = firebase.firestore();
       const auth = firebase.auth();
- // NEW: Initialize Storage service
-      const storage = firebase.storage();
- // The single document ID where all your application data will be stored.
+      const storage = firebase.storage(); 
       const FIRESTORE_DOC_ID = "main_rental_data";
- /* ------------- Utilities (MODIFIED/ADDED) ------------- */
+ /* ------------------------------------------------------------------------------------ */
+
+
+ /* -------------------------------- Utilities --------------------------------- */
       const todayStr = () => new Date().toISOString().slice(0, 10);
- const currency = (n) => {
+      const currency = (n) => {
         const num = Number(n || 0);
- try {
+        try {
           return num
             .toLocaleString(undefined, { style: "currency", currency: "BDT" })
             .replace("BDT", "৳")
             .trim();
- } catch {
-          // Fallback for browsers that don't know BDT
+        } catch {
           return `৳${num.toLocaleString()}`;
- }
+        }
       };
 
-      // NEW: Function to format YYYY-MM to descriptive month name (REQUEST 1)
       const formatMonth = (ym) => {
           if (!ym || ym.length !== 7) return "N/A";
- const [year, month] = ym.split('-');
-          // month is 1-based, so month - 1 is needed for Date constructor
+          const [year, month] = ym.split('-');
           const date = new Date(year, month - 1, 1);
- return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+          return date.toLocaleString('default', { month: 'long', year: 'numeric' });
       };
 
-      // NEW: Function to convert amount to words (BDT specific, using Lakh/Crore)
       const amountToWords = (n) => {
           if (typeof n !== 'number') {
               n = Number(n);
- }
+          }
           if (isNaN(n) || n <= 0) {
               return "Zero Taka Only";
- }
+          }
 
           const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
- const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
- const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
- function helper(num) {
+          const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+          const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+          
+          function helper(num) {
               if (num === 0) return '';
- if (num < 10) return units[num] + ' ';
+              if (num < 10) return units[num] + ' ';
               if (num < 20) return teens[num - 10] + ' ';
- if (num < 100) return tens[Math.floor(num / 10)] + ' ' + helper(num % 10);
- if (num < 1000) return units[Math.floor(num / 100)] + ' Hundred ' + helper(num % 100);
+              if (num < 100) return tens[Math.floor(num / 10)] + ' ' + helper(num % 10);
+              if (num < 1000) return units[Math.floor(num / 100)] + ' Hundred ' + helper(num % 100);
               
               let words = '';
- // Use Crore
               if (num >= 10000000) {
                   words += helper(Math.floor(num / 10000000)) + ' Crore ';
- num %= 10000000;
+                  num %= 10000000;
               }
-              // Use Lakh
               if (num >= 100000) {
                   words += helper(Math.floor(num / 100000)) + ' Lakh ';
- num %= 100000;
+                  num %= 100000;
               }
               if (num >= 1000) {
                   words += helper(Math.floor(num / 1000)) + ' Thousand ';
- num %= 1000;
+                  num %= 1000;
               }
               words += helper(num);
- return words;
+              return words;
           }
 
           let totalAmount = Math.round(n * 100) / 100;
- let taka = Math.floor(totalAmount);
+          let taka = Math.floor(totalAmount);
           let paisa = Math.round((totalAmount - taka) * 100);
 
           let takaWords = helper(taka).trim();
           let words = takaWords;
- if (words) {
+          if (words) {
               words += ' Taka';
- } else {
+          } else {
               words = '';
- }
+          }
 
           if (paisa > 0) {
               if (words) {
                   words += ' and ';
- }
-              // Converting paisa to words is complex, using fraction for simplicity/accuracy
+              }
               let paisaWords = helper(paisa).trim();
- if (paisaWords) {
+              if (paisaWords) {
                   words += paisaWords + ' Paisa';
- } else {
+              } else {
                   words += `${String(paisa).padStart(2, '0')}/100 Paisa`;
- }
+              }
           }
 
           if (words) {
               words += ' Only';
- }
+          }
 
           return words.replace(/\s+/g, ' ').trim() || "Zero Taka Only";
       };
- const monthKey = (dateStr) => {
+      
+      const monthKey = (dateStr) => {
         const d = new Date(dateStr);
- return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; // YYYY-MM
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; // YYYY-MM
       };
- const nextReceiptNo = (allPayments) => {
+      const nextReceiptNo = (allPayments) => {
         const yyyymm = monthKey(new Date().toISOString());
- const prefix = `RC-${yyyymm}-`;
+        const prefix = `RC-${yyyymm}-`;
         const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1;
         return `${prefix}${String(count).padStart(4, "0")}`;
       };
- const download = (filename, text) => {
+      const download = (filename, text) => {
         const blob = new Blob([text], { type: "application/json;charset=utf-8;" });
- const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
         link.download = filename;
@@ -158,53 +156,45 @@
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       };
- const classNames = (...c) => c.filter(Boolean).join(" ");
+      const classNames = (...c) => c.filter(Boolean).join(" ");
 
       if (!(window.crypto && window.crypto.randomUUID)) {
-        window.crypto = window.crypto ||
- {};
+        window.crypto = window.crypto || {};
         window.crypto.randomUUID = function () {
-          // RFC4122 v4-ish
           return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
             const r = (Math.random() * 16) | 0;
             const v = c === 'x' ? r : (r & 0x3) | 0x8;
             return v.toString(16);
           });
- };
+        };
       }
       
-      // Utility function to check for reminder
       const shouldShowReminder = (dueDay) => {
           const today = new Date();
- const currentDay = today.getDate();
-          
-          // Simplified check: is today the day 2 days before the dueDay?
- return Math.abs(currentDay - Number(dueDay)) === 2;
+          const currentDay = today.getDate();
+          return Math.abs(currentDay - Number(dueDay)) === 2;
       }
       
-      // Utility function to generate WhatsApp link
       const createWhatsAppLink = (tenantPhone, unitName, orgName, dueDay, rentAmount) => {
           if (!tenantPhone || !unitName) return null;
- // Clean phone number (remove +, spaces, dashes, etc.)
           const phone = tenantPhone.replace(/\D/g, '');
- const rent = currency(rentAmount);
+          const rent = currency(rentAmount);
           
           const message = `*Rent Reminder from ${orgName}*\n\nDear tenant of ${unitName},\n\nThis is a friendly reminder that your monthly rent of ${rent} is due in 2 days (on the ${dueDay}th of the month).\n\nPlease make the payment before the due date.\nThank you!`;
- const encodedMessage = encodeURIComponent(message);
+          const encodedMessage = encodeURIComponent(message);
           
           return `https://wa.me/${phone}?text=${encodedMessage}`;
       };
 
 
-      /* ------------- Demo initial data (unchanged) ------------- */
+      /* --------------------------- Demo initial data ---------------------------- */
       const initialData = {
         org: {
           name: "Shahjaha chowdhury Bari",
           address: "House: 383, Road: 13, Block: J, Bashundhara R/A, Dhaka-1230",
           phone: "+8801749333661",
           email: "Foyaz.islam@yahoo.com",
-          note: "Thank you for 
- your payment!",
+          note: "Thank you for your payment!",
      
         },
         units: [
@@ -212,8 +202,7 @@
             id: `F${i + 1}`,
             type: "Flat",
             name: `Flat ${i + 1}`,
-            floor: Math.ceil((i + 1) / 
- 2),
+            floor: Math.ceil((i + 1) / 2),
            
             rent: 15000,
             dueDay: 5,
@@ -222,7 +211,7 @@
             tenantPhotoUrl: "", 
             tenantNidUrl: "", 
         
-     rentAgreementUrl: "", 
+            rentAgreementUrl: "", 
             enableReminder: true, 
   
           })),
@@ -231,7 +220,7 @@
             type: "Shop",
             name: `Shop ${i + 1}`,
         
-     floor: 0,
+            floor: 0,
             rent: 25000,
       
             dueDay: 5,
@@ -240,7 +229,7 @@
             tenantPhotoUrl: "", 
             tenantNidUrl: "", 
         
-     rentAgreementUrl: "", 
+            rentAgreementUrl: "", 
             enableReminder: true, 
           
           })),
@@ -248,55 +237,48 @@
         payments: [], 
         expenses: []
       };
- /* ------------- Cloud Storage Functions (unchanged) ------------- */
+ 
+ /* ------------------------ Cloud Storage Functions ------------------------- */
       const localStorageKey = "rental_erp_v1";
- const loadData = async (uid) => {
+      const loadData = async (uid) => {
         try {
-          // Check for old localStorage data for one-time migration
           const rawLocal = localStorage.getItem(localStorageKey);
- if (rawLocal) {
+          if (rawLocal) {
             console.log("Found data in localStorage. Attempting cloud migration.");
- const parsed = JSON.parse(rawLocal);
-            // Save it to Firestore immediately
+            const parsed = JSON.parse(rawLocal);
             await saveData(parsed, uid);
- // Clear local storage after successful migration
             localStorage.removeItem(localStorageKey);
- alert("Local data migrated to the cloud successfully! It will now sync across devices.");
+            alert("Local data migrated to the cloud successfully! It will now sync across devices.");
             return { ...initialData, ...parsed };
- }
+          }
 
-          // Load from Firestore (using UID to scope the document path)
           const docPath = `erp_data/${uid}`;
- const docRef = db.doc(docPath);
+          const docRef = db.doc(docPath);
           const doc = await docRef.get();
 
           if (doc.exists) {
             console.log("Data loaded from cloud storage.");
- // Merge with initialData to ensure new fields are present
             return { ...initialData, ...doc.data() };
- }
+          }
 
           console.log("No cloud data found. Saving initial demo data to cloud.");
- // Initial save of demo data to the cloud
           await saveData(initialData, uid);
- return initialData;
+          return initialData;
 
         } catch (e) {
           console.error("Cloud Load error. Returning initial data.", e);
- // If load fails, we return initial data and the app will try to save on next change.
           return initialData;
- }
+        }
       };
 
       const saveData = async (data, uid) => {
         if (!uid) {
             console.error("Cannot save data: User ID is missing.");
- return;
+            return;
         }
         try {
-          // Use UID in the document path for user-specific data
           const docPath = `erp_data/${uid}`;
- const docRef = db.doc(docPath);
+          const docRef = db.doc(docPath);
           
           const dataToSave = {
             org: data.org,
@@ -304,43 +286,39 @@
             payments: data.payments,
             expenses: data.expenses,
           };
- await docRef.set(dataToSave);
+          await docRef.set(dataToSave);
           console.log(`Data saved to cloud successfully for user: ${uid}.`);
- } catch (e) {
+        } catch (e) {
           console.error("Cloud Save error.", e);
- alert("Warning: Data failed to save to the cloud. You are working offline and data will not sync.");
- }
+          alert("Warning: Data failed to save to the cloud. Check Firebase setup and security rules.");
+        }
       };
 
-      // NEW: Utility to upload file to Firebase Storage
       const uploadFile = async (file, unitId, type) => {
           const storageRef = storage.ref();
- // Use a simple path structure
           const path = `tenant_docs/${unitId}/${type}/${file.name}`;
- const fileRef = storageRef.child(path);
+          const fileRef = storageRef.child(path);
           
           console.log(`Uploading ${type} for ${unitId}...`);
           
           const snapshot = await fileRef.put(file);
           const downloadURL = await snapshot.ref.getDownloadURL();
- console.log(`Upload successful. URL: ${downloadURL}`);
+          console.log(`Upload successful. URL: ${downloadURL}`);
           return downloadURL;
       };
 
 
-      /* ------------- UI primitives (MODIFIED - Input/Select/Checkbox fixed for Babel) ------------- */
+      /* ---------------------------- UI primitives ------------------------------- */
       const Section = ({ title, right, children }) => (
         <div className="bg-white rounded-2xl shadow p-4 md:p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg md:text-xl font-semibold">{title}</h2>
             {right}
           </div>
-   
-     
           {children}
         </div>
       );
- // MODIFIED: Use explicit return for better compatibility with browser-Babel
+ 
       const Input = (props) => {
         return (
           <input
@@ -348,30 +326,25 @@
             className={classNames(
               "w-full rounded-xl border px-3 py-2 text-sm md:text-base",
               "focus:outline-none focus:ring-2 focus:ring-indigo-400",
- 
               props.className
             )}
           />
         );
- };
+      };
 
-      // MODIFIED: Use explicit return for better compatibility with browser-Babel
       const Select = (props) => {
         return (
           <select
             {...props}
             className={classNames(
               "w-full rounded-xl border px-3 py-2 text-sm md:text-base",
-              "focus:outline-none focus:ring-2 
- focus:ring-indigo-400",
+              "focus:outline-none focus:ring-2 focus:ring-indigo-400",
               props.className
             )}
           />
         );
- };
+      };
    
-        
-
       const Button = ({ children, variant = "primary", className, ...rest }) => {
         const styles = {
           primary: "bg-indigo-600 text-white hover:bg-indigo-700",
@@ -379,7 +352,7 @@
           danger: "bg-rose-600 text-white hover:bg-rose-700",
           ghost: "bg-transparent hover:bg-slate-100",
         };
- return (
+        return (
           <button
             {...rest}
             className={classNames(
@@ -387,29 +360,25 @@
               styles[variant],
               className
             )}
-   
- 
           >
             {children}
           </button>
         );
- };
+      };
       
-      // MODIFIED: Use explicit return for better compatibility with browser-Babel (FIX)
       const Checkbox = (props) => { 
         return (
           <div className="flex items-center">
               <input type="checkbox" 
                   {...props}
-                  className="h-4 w-4 rounded border-gray-300 
- text-indigo-600 focus:ring-indigo-500" 
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
               />
               {props.label && <label htmlFor={props.id} 
                 className="ml-2 text-sm text-slate-700">{props.label}</label>}
           </div>
         );
- };
-      // NEW: Custom File Upload Component
+      };
+      
       function FileUpload({ label, urlKey, unitId, setUnitForm, currentUrl }) {
           const [uploading, setUploading] = useState(false);
           const fileInputRef = useRef(null);
@@ -420,10 +389,8 @@
 
               setUploading(true);
               try {
-                  // FIX: Use urlKey instead of the undefined variable 'type'
                   const url = await uploadFile(file, unitId, urlKey); 
                   
-                  // Update the unit form state with the new URL
                   setUnitForm(f => ({ ...f, [`${urlKey}Url`]: url }));
                   alert(`${label} uploaded successfully!`);
               } catch (error) {
@@ -431,44 +398,36 @@
                   alert(`Upload failed for ${label}. Check console for details. Ensure you have enabled Firebase Storage and the security rules allow public writes.`);
               } finally {
                   setUploading(false);
-                  // Reset file input to allow uploading the same file again
                   if (fileInputRef.current) {
                       fileInputRef.current.value = null;
                   }
               }
           };
- return (
+          return (
               <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-700 block">{label}</label>
                   <input 
                       type="file" 
-                    
- 
                       ref={fileInputRef}
                       onChange={handleFileChange} 
                       disabled={uploading || !unitId} 
                       className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 
  file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                
                       />
                   {!unitId && <p className="text-xs text-rose-500">Save unit first to enable upload.</p>}
                   {currentUrl && (
-           
-               <div className="flex items-center text-xs text-emerald-600">
-                         
+                      <div className="flex items-center text-xs text-emerald-600">
                         <span className="mr-2">✅ File uploaded.</span>
-                          <a href={currentUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-700">View 
- Document</a>
+                          <a href={currentUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-700">View Document</a>
                       </div>
                   )}
-                  {uploading && <p className="text-sm text-indigo-600">Uploading... 
-              Please wait.</p>}
+                  {uploading && <p className="text-sm text-indigo-600">Uploading... Please wait.</p>}
               </div>
-        
-   );
+          );
       }
       
-      /* ------------- Main App (UPDATED) ------------- */
+      
+      /* ----------------------------- Main App --------------------------------- */
       function App({ currentUser }) {
         const [data, setData] = useState(initialData);
         const [tab, setTab] = useState("dashboard");
@@ -480,29 +439,23 @@
         // 1. Initial data fetch from cloud
         useEffect(() => {
             setLoading(true);
-            // Pass UID to loadData
             loadData(uid).then(initialData => {
                 setData(initialData);
-        
- 
                 setLoading(false);
             });
         }, [uid]);
- // Re-run when UID changes (though it shouldn't once logged in)
 
         // 2. Data Persistence (Debounced Cloud Save)
         const saveTimeout = useRef(null);
- useEffect(() => {
-          if (loading || !uid) return; // Do not save until initial load is complete or if no UID
+        useEffect(() => {
+          if (loading || !uid) return;
 
           if (saveTimeout.current) {
             clearTimeout(saveTimeout.current);
           }
 
-          // Set a new timeout to save data after a small delay (500ms)
           saveTimeout.current = setTimeout(() => {
- 
-            saveData(data, uid); // Pass UID to saveData
+            saveData(data, uid);
           }, 500); 
 
           return () => {
@@ -510,251 +463,207 @@
               clearTimeout(saveTimeout.current);
             }
           };
-       
-  
         }, [data, loading, uid]);
 
 
         const units = data.units;
- const payments = data.payments;
+        const payments = data.payments;
         const expenses = data.expenses;
         const org = data.org;
- const totals = useMemo(() => {
+        const totals = useMemo(() => {
           const income = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
           const expense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
           return { income, expense, net: income - expense };
         }, [payments, expenses]);
- const outstandingByUnit = useMemo(() => {
+        const outstandingByUnit = useMemo(() => {
           const now = new Date();
           const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
           const map = Object.fromEntries(units.map((u) => [u.id, u.rent || 0]));
           payments
             .filter((p) => (p.forMonth || "").startsWith(ym))
             .forEach((p) => {
-       
- 
               map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0);
             });
           return map; // positive means due
         }, [units, payments]);
- const filteredUnits = useMemo(() => {
+        const filteredUnits = useMemo(() => {
           if (!search) return units;
           const q = search.toLowerCase();
           return units.filter(
             (u) =>
               u.id.toLowerCase().includes(q) ||
               u.name.toLowerCase().includes(q) ||
-              (u.tenant 
- 
-                || "").toLowerCase().includes(q) ||
+              (u.tenant || "").toLowerCase().includes(q) ||
               (u.type || "").toLowerCase().includes(q)
           );
         }, [units, search]);
- const unitsForReminder = useMemo(() => {
+        const unitsForReminder = useMemo(() => {
             if (!org.name) return []; 
             return units.filter(u => 
                 u.enableReminder && 
                 u.tenantPhone && 
                 u.rent > 0 && 
-        
- 
                 u.dueDay >= 1 && u.dueDay <= 31 &&
                 shouldShowReminder(u.dueDay)
             ).map(u => ({
                 ...u,
                 whatsappLink: createWhatsAppLink(u.tenantPhone, u.name, org.name, u.dueDay, u.rent)
-          
-   }));
-      
-          }, [units, org]);
- // Data helpers
+            }));
+        }, [units, org]);
+ 
+        // Data helpers
         const updateOrg = (patch) => setData((d) => ({ ...d, org: { ...d.org, ...patch } }));
- const upsertUnit = (unit) =>
+        const upsertUnit = (unit) =>
           setData((d) => ({
             ...d,
             units: d.units.some((x) => x.id === unit.id)
               ? d.units.map((x) => (x.id === unit.id ? { ...x, ...unit } : x))
               : [...d.units, unit],
           }));
- const deleteUnit = (id) => setData((d) => ({ ...d, units: d.units.filter((u) => u.id !== id) }));
- const addPayment = (p) =>
+        const deleteUnit = (id) => setData((d) => ({ ...d, units: d.units.filter((u) => u.id !== id) }));
+        const addPayment = (p) =>
           setData((d) => ({ ...d, payments: [{ ...p, id: crypto.randomUUID() }, ...d.payments] }));
- const addExpense = (e) =>
+        const addExpense = (e) =>
           setData((d) => ({ ...d, expenses: [{ ...e, id: crypto.randomUUID() }, ...d.expenses] }));
- const exportData = () => download(`rental-erp-backup-${todayStr()}.json`, JSON.stringify(data, null, 2));
+        const exportData = () => download(`rental-erp-backup-${todayStr()}.json`, JSON.stringify(data, null, 2));
         const importData = (file) => {
           const reader = new FileReader();
- reader.onload = (evt) => {
+          reader.onload = (evt) => {
             try {
               const parsed = JSON.parse(evt.target.result);
- setData(parsed);
+              setData(parsed);
               alert("Import successful ✅");
             } catch (e) {
               alert("Import failed: invalid JSON");
- }
+            }
           };
           reader.readAsText(file);
         };
- // Reset / data management actions for Settings
+        
         const clearOrgFields = () =>
           setData((d) => ({ ...d, org: { name: "", address: "", phone: "", email: "", note: "" } }));
- const restoreDemoOrg = () =>
+        const restoreDemoOrg = () =>
           setData((d) => ({ ...d, org: { ...initialData.org } }));
- const clearPayments = () =>
+        const clearPayments = () =>
           setData((d) => ({ ...d, payments: [] }));
- const clearExpenses = () =>
+        const clearExpenses = () =>
           setData((d) => ({ ...d, expenses: [] }));
- const factoryReset = () => {
+        const factoryReset = () => {
           setData({ ...initialData });
         };
- // Auth Action (kept for completeness, but Sign Out button removed in Koder version)
+ 
         const handleSignOut = async () => {
             try {
                 await auth.signOut();
- } catch (e) {
+            } catch (e) {
                 console.error("Sign out error:", e);
- alert("Failed to sign out.");
+                alert("Failed to sign out.");
             }
         };
- return (
+
+        return (
           <div className="min-h-screen bg-slate-50 text-slate-800">
             {loading && (
               <div className="fixed inset-0 bg-white/70 z-50 flex flex-col items-center justify-center p-8 text-center">
                 <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                  <div className="text-xl font-semibold text-indigo-600 mt-4">Loading Data from Cloud...</div>
- 
                  <div className="text-sm text-slate-500 mt-2">Connecting to Firebase to sync your data.</div>
               </div>
             )}
             <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
               <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-2">
-         
                 <div className="text-xl md:text-2xl font-bold">🏢 {data.org.name}</div>
                 <div className="ml-auto flex items-center gap-2">
                     <span className="text-xs text-slate-500 hidden sm:inline">User: {currentUser.email}</span>
                   <Button variant="secondary" onClick={exportData}>⤓ Export</Button>
-             
                   <label className="cursor-pointer">
-     
                     <span className="inline-block bg-slate-100 hover:bg-slate-200 rounded-xl px-4 py-2 text-sm">Import</span>
                     <input className="hidden" type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} />
                   </label>
-               
-                {/* NOTE: Sign Out button removed from header to keep layout clean, added to Settings tab */}
                 </div>
               </div>
-          
-           
               <nav className="mx-auto max-w-6xl px-2 pb-3">
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-       
                    {[
                     ["dashboard", "Dashboard"],
                     ["units", "Units"],
-     
-                ["payments", "Payments"],
+                    ["payments", "Payments"],
                     ["newReceipt", "New Receipt"],
-                    ["statement", "Statement"], // ADDED: New Statement tab
+                    ["statement", "Statement"],
                     ["expenses", "Expenses"],
-               
-      ["settings", "Settings"],
+                    ["settings", "Settings"],
                   ].map(([key, label]) => (
                     <Button
-                     
                       key={key}
-          
-                      variant={tab === key ?
- "primary" : "secondary"}
+                      variant={tab === key ? "primary" : "secondary"}
                       className="w-full"
                       onClick={() => setTab(key)}
                       disabled={loading} 
                     >
-         
- 
                       {label}
                     </Button>
                   ))}
                 </div>
               </nav>
-          
-   </header>
+            </header>
 
-       
             <main className="mx-auto max-w-6xl p-4 space-y-4 md:space-y-6">
               {tab === "dashboard" && (
                 <DashboardSection 
                     totals={totals} 
-                  
-   units={units} 
+                    units={units} 
                     outstandingByUnit={outstandingByUnit} 
                     unitsForReminder={unitsForReminder} 
                     setTab={setTab} 
                 />
               )}
 
-    
               {tab === "units" && (
                 <Section
-  
                   title="Units (Flats & Shops)"
                   right={<Input placeholder="Search units/tenant…" value={search} onChange={(e) => setSearch(e.target.value)} />}
                 >
-      
-             <UnitsTable units={filteredUnits} upsertUnit={upsertUnit} deleteUnit={deleteUnit} />
+                  <UnitsTable units={filteredUnits} upsertUnit={upsertUnit} deleteUnit={deleteUnit} />
                 </Section>
-  
               )}
 
               {tab === "payments" && (
                 <Section title="Payments (tap a row for receipt)">
-            
-       <PaymentsTable payments={payments} units={units} onRowClick={setShowReceipt} />
+                  <PaymentsTable payments={payments} units={units} onRowClick={setShowReceipt} />
                 </Section>
-          
               )}
 
               {tab === "newReceipt" && (
                 <Section title="Create Money Receipt">
-             
-             <NewReceiptForm units={units} addPayment={addPayment} data={data} />
+                  <NewReceiptForm units={units} addPayment={addPayment} data={data} />
                 </Section>
               )}
               
-              {/* ADDED: New Statement Tab (REQUEST 2) */}
               {tab === "statement" && (
-        
                  <Section title="Income & Expense Statement">
                     <DateRangeStatement payments={payments} expenses={expenses} />
                 </Section>
               )}
 
-       
               {tab === "expenses" && (
-          
                <Section title="Expenses">
                   <ExpensesSection expenses={expenses} addExpense={addExpense} />
                 </Section>
               )}
 
               {tab === "settings" && 
-   
                 (
-     
                    <Section title="Organization Settings">
                   <OrgSettings
                     org={data.org}
                     updateOrg={updateOrg}
-             
-                
                     clearOrgFields={clearOrgFields}
                     restoreDemoOrg={restoreDemoOrg}
-                    clearPayments={() => { if (confirm("Clear ALL payments?
- This will remove every receipt...")) clearPayments(); }}
+                    clearPayments={() => { if (confirm("Clear ALL payments? This will remove every receipt...")) clearPayments(); }}
                     clearExpenses={() => { if (confirm("Clear ALL expenses? This will remove every expense entry...")) clearExpenses(); }}
                     factoryReset={() => { if (confirm("DANGER: Factory Reset? This will delete all your data and restore the demo data.")) factoryReset(); }}
-                    handleSignOut={handleSignOut} // <-- ADDED: Pass the sign out function
+                    handleSignOut={handleSignOut}
                   />
-   
                </Section>
               )}
 
@@ -762,7 +671,6 @@
                 <ReceiptModal 
                   org={data.org} 
                   payment={showReceipt} 
-  
                   unit={units.find((u) => u.id === showReceipt.unitId)} 
                   onClose={() => setShowReceipt(null)} 
                 />
@@ -770,11 +678,10 @@
 
             </main>
           </div>
-      
-   );
+        );
       }
       
-      /* ------------- Login/Auth Components (NEW) ------------- */
+      /* --------------------------- Login/Auth Components -------------------------- */
       function LoginScreen({ setAuthError }) {
           const [email, setEmail] = useState("");
           const [password, setPassword] = useState("");
@@ -795,9 +702,8 @@
                   } else if (err.code === 'auth/invalid-email') {
                       setError("Invalid email format.");
                   } else {
-                      setError("Login failed. Check console for details.");
+                      setError("Login failed. Check console for details. (Did you enable Email/Password sign-in in Firebase Auth?)");
                   }
-                  // Notify parent wrapper about auth error if needed (though onAuthStateChanged will handle it)
                   setAuthError(error);
               } finally {
                   setLoading(false);
@@ -819,7 +725,7 @@
                       <form onSubmit={handleLogin} className="space-y-4">
                           <Input
                               type="email"
-                              placeholder="Email"
+                              placeholder="Email (Must exist in Firebase Auth)"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               required
@@ -839,7 +745,7 @@
                               {loading ? "Signing In..." : "Log In"}
                           </Button>
                           <p className="text-xs text-center text-slate-500">
-                             (No signup option available)
+                             (Ensure Firebase Config is replaced and Email/Password sign-in is enabled)
                           </p>
                       </form>
                   </div>
@@ -853,6 +759,7 @@
           const [authError, setAuthError] = useState(null);
 
           useEffect(() => {
+              // Subscribe to Firebase Auth state changes
               const unsubscribe = auth.onAuthStateChanged(user => {
                   setCurrentUser(user);
                   setLoadingAuth(false);
@@ -877,51 +784,44 @@
           return <App currentUser={currentUser} />;
       }
       
-      /* ------------- Dashboard (MODIFIED - Removed Monthly Summary) ------------- */
+      /* ---------------------------- Other Components ------------------------------ */
+      // ... (DashboardSection, DateRangeStatement, UnitsTable, PaymentsTable, NewReceiptForm, ExpensesSection, OrgSettings, StatCard, ReceiptModal, and helper functions are here)
+      
       function DashboardSection({ totals, units, outstandingByUnit, unitsForReminder, setTab }) { 
         const totalDue = Object.values(outstandingByUnit).reduce((s, v) => s + Math.max(0, v), 0);
- return (
+        return (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <StatCard label="Total Income" value={currency(totals.income)} />
               <StatCard label="Total Expenses" value={currency(totals.expense)} />
               <StatCard label="Net Profit" value={currency(totals.net)} />
-              <StatCard label="Current Month 
- Due" value={currency(totalDue)} />
+              <StatCard label="Current Month Due" value={currency(totalDue)} />
 
-              {/* NEW: Reminder card */}
               {unitsForReminder.length > 0 && (
                 <div className="col-span-2 md:col-span-4">
                   <Section title="⚠️ Rent Reminder Needed Today">
-                    <div 
- className="space-y-2">
+                    <div className="space-y-2">
                       {unitsForReminder.map(u => (
                         <div key={u.id} className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 p-3">
                           <div className="font-medium">{u.name} (Due: {u.dueDay}th)</div>
-              
-             <a href={u.whatsappLink} target="_blank" rel="noopener noreferrer">
+                          <a href={u.whatsappLink} target="_blank" rel="noopener noreferrer">
                             <Button variant="primary" className="text-sm"> Send WhatsApp to {u.tenant} </Button>
                           </a>
-                       
- </div>
+                        </div>
                       ))}
                     </div>
                     <div className="text-xs text-slate-500 mt-2">These units are 2 days from their due date and have reminders enabled.</div>
                   </Section>
-    
              </div>
               )}
-              {/* End of NEW: Reminder card */}
 
               <div className="col-span-2 md:col-span-4">
                 <Section title="Quick Actions" right={<div />}>
-                  
- <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <Button className="w-full" onClick={() => setTab("newReceipt")}>New Receipt</Button>
                     <Button variant="secondary" className="w-full" onClick={() => setTab("statement")}>View Statement</Button>
                     <Button variant="secondary" className="w-full" onClick={() => setTab("units")}>Manage Units</Button>
-                   
-  <Button variant="secondary" className="w-full" onClick={() => setTab("expenses")}>Add Expense</Button>
+                    <Button variant="secondary" className="w-full" onClick={() => setTab("expenses")}>Add Expense</Button>
                   </div>
                 </Section>
               </div>
@@ -929,57 +829,42 @@
             </div>
 
             <Section title="Current Month Dues by Unit">
-              <div className="grid 
- grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {units.map((u) => (
                   <div key={u.id} className="flex items-center justify-between rounded-xl border p-3">
                     <div>
                       <div className="font-medium">{u.name}</div>
-            
-           <div className="text-xs text-slate-500">{u.tenant ||
- "Vacant"}</div>
+                      <div className="text-xs text-slate-500">{u.tenant || "Vacant"}</div>
                     </div>
-                    <div className={outstandingByUnit[u.id] > 0 ?
- "text-rose-600 font-semibold" : "text-emerald-600 font-semibold"}>
+                    <div className={outstandingByUnit[u.id] > 0 ? "text-rose-600 font-semibold" : "text-emerald-600 font-semibold"}>
                       {currency(outstandingByUnit[u.id])}
                     </div>
                   </div>
                 ))}
               </div>
-      
-       </Section>
+        </Section>
           </div>
         );
- }
+      }
       
-      /* ------------- Date Range Statement Component (MODIFIED - Date Logic Fixed) ------------- */
       function DateRangeStatement({ payments, expenses }) {
-        // Helper to get the first day of the current month (YYYY-MM-DD)
         const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10);
- // Default range: current month
         const [startDate, setStartDate] = useState(getFirstDayOfMonth(new Date()));
         const [endDate, setEndDate] = useState(todayStr());
 
         const filteredData = useMemo(() => {
-            // Helper function to create a date object normalized to local midnight
-            // This is crucial for accurate date-range filtering, avoiding UTC/timezone issues
             const getLocalDateTimestamp = (dateStr) => {
-                if (!dateStr) return 0; // dateStr is 'YYYY-MM-DD'
+                if (!dateStr) return 0;
                 const parts = dateStr.split('-');
-                // Date(year, month-1, day) creates a date at midnight in the local timezone
                 return new Date(parts[0], parts[1] - 1, parts[2]).getTime();
             };
 
-            // 1. Calculate the start boundary (local midnight of start date)
             const start = getLocalDateTimestamp(startDate);
-            // 2. Calculate the end boundary (local midnight of the day *after* the end date)
-            // Get the local midnight of the end date, then add one day's worth of milliseconds
             const end = getLocalDateTimestamp(endDate) + (24 * 60 * 60 * 1000);
             
             const isWithinRange = (dateStr) => {
                 if (!dateStr) return false;
                 const checkDate = getLocalDateTimestamp(dateStr);
-                // Check if checkDate >= start AND checkDate < end (exclusive of end day)
                 return checkDate >= start && checkDate < end;
             };
 
@@ -1005,7 +890,7 @@
                     type: 'Expense',
                     amount: Number(e.amount || 0),
                 })),
-            ].sort((a, b) => new Date(a.date) - new Date(b.date)); // Sort by date ascending
+            ].sort((a, b) => new Date(a.date) - new Date(b.date));
 
             return { combinedList, totalIncome, totalExpense, netProfit };
         }, [payments, expenses, startDate, endDate]);
@@ -1072,7 +957,6 @@
         );
       }
 
-      /* ------------- Unit Management (MODIFIED - File Uploads) ------------- */
       function UnitForm({ initialUnit, upsertUnit, deleteUnit }) {
         const [unitForm, setUnitForm] = useState(initialUnit || {
           id: "",
@@ -1083,10 +967,10 @@
           dueDay: 5,
           tenant: "",
           tenantPhone: "",
-          tenantPhotoUrl: "", // NEW
-          tenantNidUrl: "", // NEW
-          rentAgreementUrl: "", // NEW
-          enableReminder: true, // NEW
+          tenantPhotoUrl: "",
+          tenantNidUrl: "",
+          rentAgreementUrl: "",
+          enableReminder: true,
         });
         const reset = () =>
           setUnitForm({
@@ -1123,16 +1007,11 @@
                 <Input placeholder="Name" value={unitForm.name || ""} onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })} />
                 <Input type="number" placeholder="Floor" value={unitForm.floor ?? ""} onChange={(e) => setUnitForm({ ...unitForm, floor: Number(e.target.value) })} />
                 <Input type="number" placeholder="Monthly Rent" value={unitForm.rent ?? ""} onChange={(e) => setUnitForm({ ...unitForm, rent: e.target.value })} />
-                <Input type="number" placeholder="Due 
- Day (1-28)" value={unitForm.dueDay ?? ""} onChange={(e) => setUnitForm({ ...unitForm, dueDay: e.target.value })} />
-                <Input placeholder="Tenant Name" value={unitForm.tenant ||
- ""} onChange={(e) => setUnitForm({ ...unitForm, tenant: e.target.value })} />
-                <Input placeholder="Tenant Phone (for WhatsApp)" value={unitForm.tenantPhone ||
- ""} onChange={(e) => setUnitForm({ ...unitForm, tenantPhone: e.target.value })} />
-                {/* NEW: Reminder Toggle */}
+                <Input type="number" placeholder="Due Day (1-28)" value={unitForm.dueDay ?? ""} onChange={(e) => setUnitForm({ ...unitForm, dueDay: e.target.value })} />
+                <Input placeholder="Tenant Name" value={unitForm.tenant || ""} onChange={(e) => setUnitForm({ ...unitForm, tenant: e.target.value })} />
+                <Input placeholder="Tenant Phone (for WhatsApp)" value={unitForm.tenantPhone || ""} onChange={(e) => setUnitForm({ ...unitForm, tenantPhone: e.target.value })} />
                 <Checkbox id="enableReminder" label="Enable 2-day Rent Reminder (WhatsApp)" checked={unitForm.enableReminder} onChange={(e) => setUnitForm({ ...unitForm, enableReminder: e.target.checked })} />
                 <hr className="my-2 border-slate-200" />
-                {/* MODIFIED: File Uploads */}
                 <div className="font-medium text-sm mb-2">Tenant Documents (Upload)</div>
                 <FileUpload label="Tenant Photo" urlKey="tenantPhoto" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.tenantPhotoUrl} />
                 <FileUpload label="NID Scan/Photo" urlKey="tenantNid" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.tenantNidUrl} />
@@ -1155,7 +1034,6 @@
       function UnitsListTable({ units, setUnitForm, deleteUnit }) {
         const [showProfile, setShowProfile] = useState(null);
 
-        // Helper for document links in the modal
         const DocumentLink = ({ label, url }) => (
             <p className="text-sm">
                 <span className="font-medium text-slate-500">{label}:</span> 
@@ -1186,8 +1064,7 @@
                                     <p className="text-sm"><span className="font-medium text-slate-500">Due Day:</span> {unit.dueDay}th</p>
                                     <p className="text-sm">
                                         <span className="font-medium text-slate-500">Reminder:</span> 
-                                        <span className={unit.enableReminder ?
-                                            'text-emerald-600' : 'text-rose-600'}> 
+                                        <span className={unit.enableReminder ? 'text-emerald-600' : 'text-rose-600'}> 
                                             {unit.enableReminder ? 'Enabled' : 'Disabled'} 
                                         </span>
                                     </p>
@@ -1259,7 +1136,6 @@
         );
       }
 
-      /* ------------- Payments (unchanged) ------------- */
       function PaymentsTable({ payments, units, onRowClick }) {
         const list = useMemo(() => payments.sort((a, b) => new Date(b.date) - new Date(a.date)), [payments]);
         return (
@@ -1299,15 +1175,12 @@
         );
       }
 
-      /* ------------- New Receipt (unchanged from last modified version) ------------- */
       function NewReceiptForm({ units, addPayment, data }) {
         const [form, setForm] = useState({ date: todayStr(), method: "Cash", purpose: "Rent" });
-        // ADDED purpose
         useEffect(() => {
           if (!form.receiptNo) setForm((f) => ({ ...f, receiptNo: nextReceiptNo(data.payments) }));
         }, [data.payments, form.receiptNo]);
 
-        // When a unit is selected, auto-fill tenant and rent amount
         const unit = useMemo(() => units.find((u) => u.id === form.unitId), [units, form.unitId]);
         useEffect(() => {
           if (unit) {
@@ -1316,16 +1189,12 @@
         }, [unit]);
 
         const resetForm = () => setForm({ date: todayStr(), method: "Cash", purpose: "Rent", receiptNo: nextReceiptNo(data.payments) });
-        // ADDED purpose
-        // MODIFIED SUBMIT FUNCTION FOR CLEARER VALIDATION (Issue #1 fix)
         const submit = () => {
           if (!form.unitId) return alert("Please select a Unit.");
           if (!form.tenant) return alert("Please enter Tenant Name.");
           if (!form.amount) return alert("Please enter Amount.");
           if (!form.forMonth) return alert("Please select For Month.");
-          // purpose is not required if it defaults to Rent
           addPayment({ ...form, amount: Number(form.amount || 0), purpose: form.purpose || "Rent" });
-          // Use "Rent" as fallback
           alert(`Receipt ${form.receiptNo} created ✅`);
           setForm({ date: todayStr(), method: "Cash", purpose: "Rent", receiptNo: nextReceiptNo(data.payments) });
         };
@@ -1351,22 +1220,17 @@
                       </option>
                     ))}
                   </Select>
-                  <Input type="month" value={form.forMonth ||
- ""} style={{ width: "auto", height: "auto", padding: "auto", fontSize: "16px", }} onChange={(e) => setForm({ ...form, forMonth: e.target.value })} />
+                  <Input type="month" value={form.forMonth || ""} style={{ width: "auto", height: "auto", padding: "auto", fontSize: "16px", }} onChange={(e) => setForm({ ...form, forMonth: e.target.value })} />
                 </div>
-                <Input placeholder="Tenant Name (Auto-filled from Unit)" value={form.tenant ||
- ""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
-                <Input type="number" placeholder="Amount (৳)" value={form.amount ??
- ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-                <Select value={form.method ||
- ""} onChange={(e) => setForm({ ...form, method: e.target.value })}>
+                <Input placeholder="Tenant Name (Auto-filled from Unit)" value={form.tenant || ""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
+                <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                <Select value={form.method || ""} onChange={(e) => setForm({ ...form, method: e.target.value })}>
                   <option>Cash</option>
                   <option>Bank Transfer</option>
                   <option>Mobile Banking (Bkash/Nagad)</option>
                   <option>Cheque</option>
                 </Select>
-                <Input placeholder="Notes (Optional)" value={form.notes ||
- ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                <Input placeholder="Notes (Optional)" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                 <div className="flex gap-2">
                   <Button onClick={submit}>Create Receipt (No. {form.receiptNo})</Button>
                   <Button variant="secondary" onClick={resetForm}>Reset Form</Button>
@@ -1375,8 +1239,7 @@
             </div>
             <div className="md:col-span-1 bg-white border rounded-2xl p-4 space-y-3">
               <div className="font-semibold border-b pb-2">Unit Details</div>
-              {unit ?
- (
+              {unit ? (
                 <div className="text-sm space-y-1">
                   <div><span className="text-slate-500">Name:</span> {unit.name}</div>
                   <div><span className="text-slate-500">Type:</span> {unit.type}</div>
@@ -1391,7 +1254,6 @@
         );
       }
 
-      /* ------------- Expenses (unchanged) ------------- */
       function ExpensesSection({ expenses, addExpense }) {
         const [form, setForm] = useState({ date: todayStr() });
         const list = useMemo(() => expenses.sort((a, b) => new Date(b.date) - new Date(a.date)), [expenses]);
@@ -1449,21 +1311,16 @@
         );
       }
 
-      /* ------------- OrgSettings (MODIFIED - Added Sign Out Button) ------------- */
-      function OrgSettings({ org, updateOrg, clearOrgFields, restoreDemoOrg, clearPayments, clearExpenses, factoryReset, handleSignOut }) { // <-- MODIFIED
+      function OrgSettings({ org, updateOrg, clearOrgFields, restoreDemoOrg, clearPayments, clearExpenses, factoryReset, handleSignOut }) {
         return (
           <div className="grid md:grid-cols-3 gap-3 md:gap-4">
             <div className="md:col-span-2 space-y-3 bg-slate-50 border rounded-2xl p-3">
               <div className="font-semibold border-b pb-2">Your Organization / Property Info</div>
               <Input placeholder="Name (e.g., Foyaz Properties)" value={org.name || ""} onChange={(e) => updateOrg({ name: e.target.value })} />
-              <Input placeholder="Address" value={org.address ||
- ""} onChange={(e) => updateOrg({ address: e.target.value })} />
-              <Input placeholder="Phone" value={org.phone ||
- ""} onChange={(e) => updateOrg({ phone: e.target.value })} />
-              <Input placeholder="Email" value={org.email ||
- ""} onChange={(e) => updateOrg({ email: e.target.value })} />
-              <Input placeholder="Receipt Note" value={org.note ||
- ""} onChange={(e) => updateOrg({ note: e.target.value })} />
+              <Input placeholder="Address" value={org.address || ""} onChange={(e) => updateOrg({ address: e.target.value })} />
+              <Input placeholder="Phone" value={org.phone || ""} onChange={(e) => updateOrg({ phone: e.target.value })} />
+              <Input placeholder="Email" value={org.email || ""} onChange={(e) => updateOrg({ email: e.target.value })} />
+              <Input placeholder="Receipt Note" value={org.note || ""} onChange={(e) => updateOrg({ note: e.target.value })} />
               <div className="flex gap-2 pt-1">
                 <Button variant="secondary" onClick={clearOrgFields}>Reset Org Fields</Button>
                 <Button variant="secondary" onClick={restoreDemoOrg}>Restore Demo Org</Button>
@@ -1477,7 +1334,6 @@
                 <Button variant="danger" onClick={factoryReset}>Factory Reset (Everything)</Button>
               </div>
               
-              {/* NEW LOGOUT BUTTON */}
               <div className="pt-4 border-t mt-4">
                   <div className="font-semibold text-base mb-2">User Session</div>
                   <Button variant="danger" className="w-full" onClick={handleSignOut}>
@@ -1493,7 +1349,6 @@
         );
       }
 
-      /* ------------- Receipt Modal (unchanged) ------------- */
       function StatCard({ label, value }) {
         return (
           <div className="bg-white rounded-xl shadow p-4 border space-y-1">
@@ -1514,7 +1369,6 @@
           printWindow.document.write(content);
           printWindow.document.close();
           printWindow.focus();
-          // Timeout to ensure content is rendered before print dialog appears
           setTimeout(() => {
               printWindow.print();
           }, 500);
@@ -1575,7 +1429,6 @@
         return String(str || "").replace(/[&<>'"/]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;","/":"&#x2F;"}[c] || c));
       }
       
-      // MODIFIED: Simplified receipt structure, reduced font sizes and padding for minimal height.
       function renderReceiptInner(org, payment, unit) {
         const amountInWords = amountToWords(payment.amount);
         const unitName = unit?.name || payment.unitId || "N/A";
@@ -1585,8 +1438,7 @@
  <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 0;">
  <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;">
  <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1>
- <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} |
- Phone: ${escapeHTML(org.phone)} | Email: ${escapeHTML(org.email)}</p>
+ <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)} | Email: ${escapeHTML(org.email)}</p>
  </div>
  
  <div style="text-align:center; margin-top: 10px; margin-bottom: 10px;">
@@ -1626,27 +1478,23 @@
         <head>
           <title>Money Receipt - ${payment.receiptNo}</title>
           <style>
-            /* Print-specific styles */
             @media print {
-              @page { size: A4 portrait; margin: 5mm; } /* Minimal margin to fit more */
+              @page { size: A4 portrait; margin: 5mm; }
               body { background:white !important; }
               .sheet {
-                /* Set fixed size for approx 1/5 of A4 height (297mm). 55mm * 5 = 275mm */
                 height: 55mm; 
                 max-width: 200mm; 
-                margin-bottom: 3mm; /* Small space between receipts */
-                padding: 8px; /* Greatly reduced padding */
+                margin-bottom: 3mm;
+                padding: 8px;
                 page-break-after: always;
-                border: 1px dotted #ccc; /* Use dotted line border for easy cutting */
+                border: 1px dotted #ccc;
                 border-radius: 0;
                 box-shadow: none;
               }
-              /* Do not break page after the last receipt */
               .sheet:last-child {
                 page-break-after: avoid;
               }
             }
-            /* Styling for screen preview */
             body { background:#f8fafc; margin:0; padding:16px; }
             .sheet { background:white; padding:16px; border:1px solid #e2e8f0; border-radius:12px; max-width: 600px; }
           </style>
