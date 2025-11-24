@@ -677,7 +677,7 @@
               )}
 
               {tab === "payments" && (
-                <Section title="Payments (tap a row for receipt)">
+                <Section title="Payments">
                   <PaymentsTable payments={payments} units={units} onRowClick={setShowReceipt} />
                 </Section>
           
@@ -765,7 +765,7 @@
           return (
               <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
                   <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 space-y-4">
-                      <h1 className="text-2xl font-bold text-center text-indigo-700">Mobile ERP Login</h1>
+                      <h1 className="text-2xl font-bold text-center text-indigo-700">Home/Shop Rent ERP</h1>
                       <p className="text-center text-sm text-slate-500">Please sign in to continue.</p>
                       
                       {error && (
@@ -777,7 +777,7 @@
                       <form onSubmit={handleLogin} className="space-y-4">
                           <Input
                               type="email"
-                              placeholder="Email (Must exist in Firebase Auth)"
+                              placeholder="Email"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               required
@@ -797,7 +797,7 @@
                               {loading ? "Signing In..." : "Log In"}
                           </Button>
                           <p className="text-xs text-center text-slate-500">
-                             (Ensure Firebase Config is replaced and Email/Password sign-in is enabled)
+                             Developed By Foyaz CHowdhury
                           </p>
                       </form>
                   </div>
@@ -880,7 +880,7 @@
 
             </div>
 
-            <Section title="Current Month Dues by Unit">
+            <Section title="Current Month Dues">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {units.map((u) => (
                   <div key={u.id} className="flex items-center justify-between rounded-xl border p-3">
@@ -1325,7 +1325,7 @@
                 />
               </div>
 
-              <Input placeholder="Tenant Name (Auto-filled from Unit)" value={form.tenant || ""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
+              <Input placeholder="Tenant Name" value={form.tenant || ""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
               <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
 
               <Select value={form.method || ""} onChange={(e) => setForm({ ...form, method: e.target.value })}>
@@ -1377,7 +1377,7 @@
             <div className="md:col-span-1 bg-slate-50 border rounded-2xl p-3 space-y-2"> 
               <div className="font-semibold">Add Expense</div> 
               <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={{ width: "auto", height: "auto", padding: "auto", fontSize: "16px", }} /> 
-              <Input placeholder="Category (e.g., Maintenance)" value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} /> 
+              <Input placeholder="Category" value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} /> 
               <Input placeholder="Vendor/Payee" value={form.vendor || ""} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /> 
               <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} /> 
               <Input placeholder="Notes" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /> 
