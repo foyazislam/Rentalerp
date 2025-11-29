@@ -467,11 +467,50 @@
         const [tab, setTab] = useState("dashboard");
         const [search, setSearch] = useState("");
         const [showReceipt, setShowReceipt] = useState(null); 
-        const [loading, setLoading] = useState(true);
-        // MODIFIED: Use a test UID if currentUser is null/undefined
-        const uid = currentUser?.uid || "TEST_USER_ID"; 
+        // ... existing state definitions
+    const [loading, setLoading] = useState(true);
+    
+    // NEW: State for password protection
+    const [deleteRequest, setDeleteRequest] = useState(null); // { type: 'payment'|'expense', id: string }
+    const [showSettingsPrompt, setShowSettingsPrompt] = useState(false);
+    
+    // MODIFIED: Use a test UID if currentUser is null/undefined
+    const uid = currentUser?.uid || "TEST_USER_ID"; 
+    
+    // ... existing saveToCloud definition ...
 
-        // 1. Initial data fetch from cloud
+    // NEW: Function to check password via Firebase re-authentication (using login password)
+    const isPasswordCorrect = async (password) => {
+        if (!currentUser?.email) {
+            console.error("No user email available for password check.");
+            return false;
+        }
+        try {
+            // Re-sign in with email and password
+            await auth.signInWithEmailAndPassword(currentUser.email, password);
+            return true;
+        } catch (error) {
+            console.log("Password check failed:", error.code, error.message);
+            return false;
+        }
+    };
+    
+// ... existing useEffects for data fetching/persistence ...
+
+// ... existing data structure access and helper functions (updateOrg, addPayment, etc.) ...
+    
+    // NEW: Deletion handlers - Called AFTER password verification
+    const deletePayment = (id) => {
+        setData((d) => ({ ...d, payments: d.payments.filter((p) => p.id !== id) }));
+        setDeleteRequest(null);
+        alert("Payment deleted successfully.");
+    };
+    const deleteExpense = (id) => {
+        setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) }));
+        setDeleteRequest(null);
+        alert("Expense deleted successfully.");
+    };
+// ...// 1. Initial data fetch from cloud
         useEffect(() => {
             setLoading(true);
             // Pass UID to loadData
@@ -673,7 +712,14 @@
                       key={key}
                       variant={tab === key ? "primary" : "secondary"}
                       className="w-full"
-                      onClick={() => setTab(key)}
+                      onClick={() => {
+                          // Only prompt if key is 'settings' AND user is logged in (not TEST_USER)
+                          if (key === 'settings' && currentUser) {
+                              setShowSettingsPrompt(true);
+                          } else {
+                              setTab(key);
+                          }
+                      }}
                       disabled={loading} 
                     >
          
@@ -708,11 +754,15 @@
               )}
 
               {tab === "payments" && (
-                <Section title="Payments">
-                  <PaymentsTable payments={payments} units={units} onRowClick={setShowReceipt} />
-                </Section>
-          
-              )}
+                          <Section title="Payments">
+                              <PaymentsTable 
+                                  payments={payments} 
+                                  units={units} 
+                                  onRowClick={setShowReceipt} 
+                                  onDelete={(id) => setDeleteRequest({ type: 'payment', id })} // <-- ADD THIS LINE
+                              />
+                          </Section>
+                      )}
 
               {tab === "newReceipt" && (
                 <Section title="Create Money Receipt">
@@ -729,10 +779,14 @@
 
        
               {tab === "expenses" && (
-                <Section title="Expenses">
-                  <ExpensesSection expenses={expenses} addExpense={addExpense} />
-                </Section>
-              )}
+                          <Section title="Expenses">
+                              <ExpensesSection 
+                                  expenses={expenses} 
+                                  addExpense={addExpense} 
+                                  onDeleteExpense={(id) => setDeleteRequest({ type: 'expense', id })} // <-- ADD THIS LINE
+                              />
+                          </Section>
+                      )}
 
               {tab === "settings" && 
    
@@ -761,9 +815,105 @@
               )}
 
             </main>
-          </div>
-        );
+             
+
+                  {/* NEW: Password protection modal for Settings and Deletion */}
+                  {(showSettingsPrompt || deleteRequest) && (
+                      <PasswordPromptModal 
+                          currentUser={currentUser}
+                          isPasswordCorrect={isPasswordCorrect}
+                          onClose={() => { 
+                              setShowSettingsPrompt(false); 
+                              setDeleteRequest(null); 
+                          }}
+                          onSuccess={() => {
+                              if (showSettingsPrompt) {
+                                  // Successful entry for Settings
+                                  setTab('settings');
+                                  setShowSettingsPrompt(false);
+                              } else if (deleteRequest) {
+                                  // Successful entry for Deletion
+                                  if (deleteRequest.type === 'payment') {
+                                      deletePayment(deleteRequest.id);
+                                  } else if (deleteRequest.type === 'expense') {
+                                      deleteExpense(deleteRequest.id);
+                                  }
+                              }
+                          }}
+                          actionLabel={
+                              showSettingsPrompt ? "Access Settings" : 
+                              deleteRequest?.type === 'payment' ? "Delete Payment" : 
+                              deleteRequest?.type === 'expense' ? "Delete Expense" : "Authorize Action"
+                          }
+                      />
+                  )}
+                  
+              </div>
+          );
       }
+// ...
+
+/* ------------- NEW: Password Protection Component ------------- */
+
+function PasswordPromptModal({ currentUser, isPasswordCorrect, onClose, onSuccess, actionLabel }) {
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+        setLoading(true);
+
+        // Bypass check in TEST MODE (if Firebase not configured)
+        if (!currentUser) {
+            alert("Password protection is disabled in TEST MODE (Firebase not configured). Action authorized.");
+            onSuccess();
+            setLoading(false);
+            return;
+        }
+
+        const correct = await isPasswordCorrect(password);
+        setLoading(false);
+
+        if (correct) {
+            onSuccess();
+        } else {
+            setError("Incorrect login password. Please try again.");
+            setPassword("");
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-0 md:p-6">
+            <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-xl p-6 space-y-4">
+                <h2 className="text-xl font-bold text-indigo-700">{actionLabel} - Password Required</h2>
+                <p className="text-sm text-slate-600">
+                    Please enter your login password to proceed with: <strong>{actionLabel}</strong>.
+                </p>
+                <form onSubmit={handleSubmit} className="space-y-3">
+                    <Input 
+                        type="password" 
+                        placeholder="Login Password" 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        required 
+                        disabled={loading}
+                    />
+                    {error && <p className="text-sm text-rose-600">{error}</p>}
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={loading || !password}>
+                            {loading ? "Verifying..." : actionLabel}
+                        </Button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
 /* --------------------------- Login/Auth Components -------------------------- */
       // Keeping these commented out but available for re-enabling
      
@@ -1213,7 +1363,7 @@
         );
       }
       /* ------------- Payments (unchanged) ------------- */
-      function PaymentsTable({ payments, units, onRowClick }) {
+      function PaymentsTable({ payments, units, onRowClick, onDelete }) {
         const [q, setQ] = useState("");
         const [month, setMonth] = useState("");
         const list = useMemo(() => {
@@ -1263,8 +1413,9 @@
                     <th className="p-3 text-left">Tenant</th>
                     <th className="p-3 text-right">Amount</th>
                     <th className="p-3 text-left">Month</th>
-                    <th className="p-3 text-left">Method</th>
-                  </tr>
+                    <th className="p-3 text-left">Method</th> 
+                    <th className="p-3 text-left">Actions</th> 
+               </tr>
                 </thead>
                 <tbody>
                   {list.map((p) => (
@@ -1275,8 +1426,14 @@
                       <td className="p-3">{p.tenant}</td>
                       <td className="p-3 text-right font-semibold">{currency(p.amount)}</td>
                       <td className="p-3">{formatMonth(p.forMonth)}</td>
-                      <td className="p-3">{p.method}</td>
-                    </tr>
+                      <td className="p-3 cursor-pointer" onClick={() => onRowClick(p)}>{p.method}</td>
+                      <td className="p-3"> {/* NEW ACTIONS COLUMN */}
+                      <Button variant="danger" className="text-xs py-1 px-2" onClick={() => onDelete(p.id)}>
+                                        Delete
+                                    </Button>
+                                </td> 
+                             </tr>
+                    
                   ))}
                 </tbody>
               </table>
@@ -1392,7 +1549,7 @@
         );
       }
       /* ------------- Expenses (unchanged) ------------- */
-      function ExpensesSection({ expenses, addExpense }) {
+      function ExpensesSection({ expenses, addExpense, onDeleteExpense }) {
         const [form, setForm] = useState({ date: todayStr() });
         const resetForm = () => setForm({ date: todayStr() }); 
         const submit = () => { 
@@ -1427,6 +1584,7 @@
                     <th className="p-3 text-left">Category</th> 
                     <th className="p-3 text-left">Vendor</th> 
                     <th className="p-3 text-right">Amount</th> 
+                    <th className="p-3 text-left">Actions</th> 
                   </tr> 
                 </thead> 
                 <tbody> 
@@ -1436,6 +1594,11 @@
                       <td className="p-3 font-medium">{e.category}</td> 
                       <td className="p-3">{e.vendor}</td> 
                       <td className="p-3 text-right text-rose-600 font-semibold">{currency(e.amount)}</td> 
+                      <td className="p-3"> {/* NEW ACTIONS COLUMN */}
+                      <Button variant="danger" className="text-xs py-1 px-2" onClick={() => onDeleteExpense(e.id)}>
+                                        Delete
+                                    </Button>
+                                </td> 
                     </tr> 
                   ))} 
                 </tbody> 
@@ -1556,7 +1719,7 @@
 
             <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;">
               <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div>
-              <div style="text-align:center;">
+              <div style="margin-right:16%;">
                 <div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px;">Authorized Signature</div>
               </div>
             </div>
