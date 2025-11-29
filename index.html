@@ -1552,7 +1552,8 @@
 </tr>
 </table>
             ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""}
-
+<div>
+</div>
             <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;">
               <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div>
               <div style="text-align:center;">
@@ -1576,7 +1577,7 @@
               body { background:white !important; }
               .sheet {
                 /* Set fixed size for approx 1/5 of A4 height (297mm). 55mm * 5 = 275mm */
-                height: 55mm; 
+                height: 60mm; 
                 max-width: 200mm; 
                 margin-bottom: 3mm; /* Small space between receipts */
                 padding: 8px; /* Greatly reduced padding */
