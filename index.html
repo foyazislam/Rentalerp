@@ -1362,85 +1362,74 @@ function PasswordPromptModal({ currentUser, isPasswordCorrect, onClose, onSucces
           </div>
         );
       }
-      /* ------------- Payments (unchanged) ------------- */
-      function PaymentsTable({ payments, units, onRowClick, onDelete }) {
-        const [q, setQ] = useState("");
-        const [month, setMonth] = useState("");
-        const list = useMemo(() => {
-          const filtered = payments.filter((p) => {
-            if (month && (p.forMonth || "").slice(0, 7) !== month) return false;
-            if (q) {
-              const lowerQ = q.toLowerCase();
-              return (
-                (units.find((u) => u.id === p.unitId)?.name || p.unitId || "").toLowerCase().includes(lowerQ) ||
-                (p.tenant || "").toLowerCase().includes(lowerQ) ||
-                (p.receiptNo || "").toLowerCase().includes(lowerQ)
-              );
-            }
-            return true;
-          });
-          return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-        }, [payments, units, q, month]);
+      /* ------------- Payments Table (MODIFIED to unmerge Print and Delete buttons) ------------- */
+function PaymentsTable({ payments, units, onRowClick, onDelete }) {
+  const [search, setSearch] = useState("");
+  const filtered = useMemo(() => {
+    if (!search) return payments;
+    const q = search.toLowerCase();
+    return payments.filter(
+      (p) =>
+        (p.receiptNo || "").toLowerCase().includes(q) ||
+        (p.unitId || "").toLowerCase().includes(q) ||
+        (p.tenant || "").toLowerCase().includes(q) ||
+        (units.find((u) => u.id === p.unitId)?.name || "").toLowerCase().includes(q)
+    ).sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort descending by date
+  }, [payments, search, units]);
 
-        return (
-          <div>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
-              <Input placeholder="Search unit/tenant/receipt…" value={q} onChange={(e) => setQ(e.target.value)} className="md:col-span-3" />
-              <Input 
-                type="month" 
-                value={month} 
-                onChange={(e) => setMonth(e.target.value)} 
-                style={{
-                  width: "auto",
-                  height: "auto",
-                  padding: "auto",
-                  fontSize: "16px",
-                }} />
-              <div className="md:col-span-2 flex gap-2">
-                <Button variant="secondary" onClick={() => { setQ(""); setMonth(""); }} 
-                  style={{ width: "auto", height: "auto", padding: "auto", fontSize: "16px", }}>
-                  Reset
-                </Button>
-              </div>
-            </div>
-            <div className="overflow-auto rounded-2xl border">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-100 text-slate-600">
-                  <tr>
-                    <th className="p-3 text-left">Date</th>
-                    <th className="p-3 text-left">Receipt #</th>
-                    <th className="p-3 text-left">Unit</th>
-                    <th className="p-3 text-left">Tenant</th>
-                    <th className="p-3 text-right">Amount</th>
-                    <th className="p-3 text-left">Month</th>
-                    <th className="p-3 text-left">Method</th> 
-                    <th className="p-3 text-left">Actions</th> 
-               </tr>
-                </thead>
-                <tbody>
-                  {list.map((p) => (
-                    <tr key={p.id} className="border-t hover:bg-slate-50 cursor-pointer" onClick={() => onRowClick(p)}>
-                      <td className="p-3">{p.date}</td>
-                      <td className="p-3 font-medium">{p.receiptNo}</td>
-                      <td className="p-3">{units.find((u) => u.id === p.unitId)?.name || p.unitId}</td>
-                      <td className="p-3">{p.tenant}</td>
-                      <td className="p-3 text-right font-semibold">{currency(p.amount)}</td>
-                      <td className="p-3">{formatMonth(p.forMonth)}</td>
-                      <td className="p-3 cursor-pointer" onClick={() => onRowClick(p)}>{p.method}</td>
-                      <td className="p-3"> {/* NEW ACTIONS COLUMN */}
-                      <Button variant="danger" className="text-xs py-1 px-2" onClick={() => onDelete(p.id)}>
-                                        Delete
-                                    </Button>
-                                </td> 
-                             </tr>
-                    
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      }
+  return (
+    <div className="space-y-4">
+      <Input placeholder="Search payments..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="overflow-auto rounded-2xl border">
+        <table className="min-w-full text-sm">
+          <thead className="bg-slate-100 text-slate-600">
+            <tr>
+              <th className="p-3 text-left">Date</th>
+              <th className="p-3 text-left">Receipt No.</th>
+              <th className="p-3 text-left">Unit</th>
+              <th className="p-3 text-left">Tenant</th>
+              <th className="p-3 text-right">Amount</th>
+              <th className="p-3 text-left">Method</th>
+              <th className="p-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((p) => (
+              <tr key={p.id} className="border-t hover:bg-slate-50">
+                <td className="p-3 whitespace-nowrap">{p.date}</td>
+                <td className="p-3 whitespace-nowrap">{p.receiptNo}</td>
+                <td className="p-3 whitespace-nowrap">{units.find((u) => u.id === p.unitId)?.name || p.unitId}</td>
+                <td className="p-3 whitespace-nowrap">{p.tenant}</td>
+                <td className="p-3 text-right whitespace-nowrap">{currency(p.amount)}</td>
+                {/* MODIFIED: Removed the cursor-pointer class and onClick to unmerge Print action [cite: 1304] */}
+                <td className="p-3">{p.method}</td>
+                <td className="p-3">
+                  {/* MODIFIED: Added a flex container and a dedicated Print button [cite: 1304] */}
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="secondary" 
+                      className="text-xs py-1 px-2" 
+                      onClick={() => onRowClick(p)} // This now triggers the print/view receipt modal
+                    > 
+                      Print 
+                    </Button>
+                    <Button 
+                      variant="danger" 
+                      className="text-xs py-1 px-2" 
+                      onClick={() => onDelete(p.id)}
+                    > 
+                      Delete 
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
       /* ------------- New Receipt (unchanged from last modified version) ------------- */
       function NewReceiptForm({ units, addPayment, data }) {
         const [form, setForm] = useState({ date: todayStr(), method: "Cash", purpose: "Rent" }); // ADDED purpose
