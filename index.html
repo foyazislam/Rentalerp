@@ -27,7 +27,7 @@
               }
             },
             padding: {
-              'safe-bottom': 'env(safe-area-inset-bottom)', /* Fix for iPhone Home Bar */
+              'safe-bottom': 'env(safe-area-inset-bottom)',
             }
           }
         }
@@ -135,7 +135,7 @@
 
       /* ------------- Initial Data ------------- */
       const initialData = {
-        org: { name: "Shahjaha chowdhury Bari", address: "House: 383, Road: 13, Block: J, Bashundhara R/A, Dhaka-1230", phone: "+8801749333661", email: "Foyaz.islam@yahoo.com", note: "Thank you for your payment!", },
+        org: { name: "Shahjahan chowdhury Bari", address: "House: 383, Road: 13, Block: J, Bashundhara R/A, Dhaka-1230", phone: "+8801749333661", email: "Foyaz.islam@yahoo.com", note: "Thank you for your payment!", },
         settings: { theme: 'indigo', darkMode: false },
         units: [ ...Array.from({ length: 10 }).map((_, i) => ({ id: `F${i + 1}`, type: "Flat", name: `Flat ${i + 1}`, floor: Math.ceil((i + 1) / 2), rent: 15000, dueDay: 5, tenant: "", tenantPhone: "", tenantPhotoUrl: "", tenantNidUrl: "", rentAgreementUrl: "", enableReminder: true, })), ...Array.from({ length: 5 }).map((_, i) => ({ id: `S${i + 1}`, type: "Shop", name: `Shop ${i + 1}`, floor: 0, rent: 25000, dueDay: 5, tenant: "", tenantPhone: "", tenantPhotoUrl: "", tenantNidUrl: "", rentAgreementUrl: "", enableReminder: true, })), ],
         payments: [], expenses: []
@@ -145,7 +145,17 @@
       const localStorageKey = "rental_erp_v1";
       const loadData = async (uid = "TEST_USER_ID") => { try { const rawLocal = localStorage.getItem(localStorageKey); if (rawLocal) { const parsed = JSON.parse(rawLocal); await saveData(parsed, uid); localStorage.removeItem(localStorageKey); alert("Local data migrated to the cloud successfully!"); return { ...initialData, ...parsed }; } const docPath = `erp_data/${uid}`; const docRef = db.doc(docPath); const doc = await docRef.get(); if (doc.exists) return { ...initialData, ...doc.data() }; await saveData(initialData, uid); return initialData; } catch (e) { console.error("Cloud Load error", e); return initialData; } };
       const saveData = async (data, uid = "TEST_USER_ID") => { if (!uid) return; try { const docPath = `erp_data/${uid}`; await db.doc(docPath).set({ org: data.org, settings: data.settings || { theme: 'indigo', darkMode: false }, units: data.units, payments: data.payments, expenses: data.expenses, }); } catch (e) { console.error("Cloud Save error", e); alert("Warning: Data failed to save to the cloud."); } };
-      const uploadFile = async (file, unitId, type) => { const storageRef = storage.ref(); const path = `tenant_docs/${unitId}/${type}/${file.name}`; const snapshot = await storageRef.child(path).put(file); return await snapshot.ref.getDownloadURL(); };
+      
+      // FIXED SECURITY: Now includes USER ID in the file path to prevent data mixing between friends sharing the app
+      const uploadFile = async (file, unitId, type) => { 
+          const user = auth.currentUser;
+          if (!user) { alert("You must be logged in to upload files."); return null; }
+          const storageRef = storage.ref(); 
+          // Path is now: tenant_docs/USER_UID/UNIT_ID/...
+          const path = `tenant_docs/${user.uid}/${unitId}/${type}/${file.name}`; 
+          const snapshot = await storageRef.child(path).put(file); 
+          return await snapshot.ref.getDownloadURL(); 
+      };
 
       /* ------------- Mobile-Optimized Components ------------- */
       const Section = ({ title, right, children }) => (
@@ -580,9 +590,7 @@
           const unitName = unit?.name || payment.unitId || "N/A"; 
           const formattedMonth = formatMonth(payment.forMonth); 
           const displayDate = formatDisplayDate(payment.date); 
-          // Logic: If purpose is "Rent" (old data), display "Rent And Service Charge". Otherwise display actual.
           const displayPurpose = (payment.purpose === "Rent" || !payment.purpose) ? "Rent And Service Charge" : payment.purpose;
-
           return ` <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 20px; background: white; border: 1px solid #ddd;"> <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;"> <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1> <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)}</p> </div> <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2> <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;"> <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span> <span><b>Date:</b> ${escapeHTML(displayDate)}</span> </div> <table style="width:100%; font-size:14px; border-collapse: collapse;"> <tr><td style="padding:4px 0;"><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td></tr> <tr> <td style="padding:4px 0;"><b>For Unit No:</b> ${escapeHTML(unitName)}</td> <td style="padding:4px 0;"><b>Purpose:</b> ${escapeHTML(displayPurpose)}</td> </tr> <tr> <td style="padding:4px 0;"><b>For The Month:</b> ${escapeHTML(formattedMonth)}</td> <td style="padding:4px 0;"><b>Method:</b> ${escapeHTML(payment.method)}</td> </tr> <tr> <td style="padding:4px 0;"><b>In Words:</b> ${amountToWords(payment.amount)}</td> <td style="padding:4px 0;"><b>Amount:</b> <b style="font-size:16px;">${currency(payment.amount)}</b></td> </tr> </table> ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""} <div style="height:30px;"></div> <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;"> <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div> <div style="margin-right:10px;"><div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px; text-align:center;">Authorized Signature</div></div> </div> </div> `; 
       }
       function renderReceiptHTML(org, payment, unit) { return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Receipt</title><style>@media print{@page{size:A4 portrait;margin:0.5mm}body{background:white!important}.sheet{height:60mm;max-width:200mm;margin-bottom:3mm;padding:8px;page-break-after:always;border:1px dotted #ccc}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;padding:0}</style></head><body><div class="sheet">${renderReceiptInner(org, payment, unit)}</div></body></html>`; }
