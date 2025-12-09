@@ -2,8 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
     <title>Home/Shop RMS</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -14,70 +15,91 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script> 
     
+    <script>
+      tailwind.config = {
+        darkMode: 'class', 
+        theme: {
+          extend: {
+            colors: {
+              indigo: {
+                50: 'var(--theme-50)', 100: 'var(--theme-100)', 200: 'var(--theme-200)', 300: 'var(--theme-300)', 400: 'var(--theme-400)',
+                500: 'var(--theme-500)', 600: 'var(--theme-600)', 700: 'var(--theme-700)', 800: 'var(--theme-800)', 900: 'var(--theme-900)',
+              }
+            },
+            padding: {
+              'safe-bottom': 'env(safe-area-inset-bottom)', /* Fix for iPhone Home Bar */
+            }
+          }
+        }
+      }
+    </script>
+
     <style>
-      html, body { height: 100%; background: #f1f5f9; }
+      /* Base Styles & Transitions */
+      html, body { height: 100%; transition: background-color 0.3s ease, color 0.3s ease; overscroll-behavior-y: none; }
+      body { -webkit-tap-highlight-color: transparent; }
+      
+      /* Theme Variables (Default Indigo) */
+      :root {
+        --theme-50: #eef2ff; --theme-100: #e0e7ff; --theme-200: #c7d2fe; --theme-300: #a5b4fc; --theme-400: #818cf8;
+        --theme-500: #6366f1; --theme-600: #4f46e5; --theme-700: #4338ca; --theme-800: #3730a3; --theme-900: #312e81;
+      }
+
+      /* Scrollbars */
+      .overflow-auto::-webkit-scrollbar { height: 4px; width: 4px; }
+      .overflow-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      .dark .overflow-auto::-webkit-scrollbar-thumb { background: #475569; }
+
+      /* Mobile Input Optimization */
+      input[type="date"], input[type="month"] {
+        -webkit-appearance: none; appearance: none;
+        background-color: #ffffff !important;
+        min-height: 44px; /* Taller touch target */
+      }
+      .dark input[type="date"], .dark input[type="month"] {
+        background-color: #1e293b !important; color: #ffffff !important; border-color: #334155 !important; color-scheme: dark;
+      }
     </style>
   </head>
-  <body>
+  <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
     <div id="root"></div>
 
     <script type="text/babel">
       const { useEffect, useMemo, useRef, useState } = React;
 
-      /* ------------- Firebase Setup (REPLACE THESE CONFIG VALUES) ------------- */
-      // ⚠️ IMPORTANT: You must replace the placeholders below with your actual Firebase project configuration.
+      /* ------------- Firebase Setup ------------- */
       const firebaseConfig = {
         apiKey: "AIzaSyBR20axEzJjcoNNyGxxxvc6AZYrxPBQ6M4",
-  authDomain: "homeshop-rms.firebaseapp.com",
-  projectId: "homeshop-rms",
-  storageBucket: "homeshop-rms.firebasestorage.app",
-  messagingSenderId: "860746996508",
-  appId: "1:860746996508:web:7a9360811037941725b8d9"
-};
-      // Initialize Firebase App, Firestore, Auth, and Storage
-      if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-      }
+        authDomain: "homeshop-rms.firebaseapp.com",
+        projectId: "homeshop-rms",
+        storageBucket: "homeshop-rms.firebasestorage.app",
+        messagingSenderId: "860746996508",
+        appId: "1:860746996508:web:7a9360811037941725b8d9"
+      };
+
+      if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
       const db = firebase.firestore();
       const auth = firebase.auth();
-      // NEW: Initialize Storage service
       const storage = firebase.storage();
-      // The single document ID where all your application data will be stored.
-      const FIRESTORE_DOC_ID = "main_rental_data";
 
-      /* ------------- Utilities (MODIFIED/ADDED) ------------- */
+      /* ------------- Theme Definitions ------------- */
+      const THEMES = {
+        indigo: { name: 'Default', colors: { 50:'#eef2ff', 100:'#e0e7ff', 200:'#c7d2fe', 300:'#a5b4fc', 400:'#818cf8', 500:'#6366f1', 600:'#4f46e5', 700:'#4338ca', 800:'#3730a3', 900:'#312e81' }},
+        blue: { name: 'Ocean', colors: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 800:'#1e40af', 900:'#1e3a8a' }},
+        emerald: { name: 'Forest', colors: { 50:'#ecfdf5', 100:'#d1fae5', 200:'#a7f3d0', 300:'#6ee7b7', 400:'#34d399', 500:'#10b981', 600:'#059669', 700:'#047857', 800:'#065f46', 900:'#064e3b' }},
+        orange: { name: 'Sunset', colors: { 50:'#fff7ed', 100:'#ffedd5', 200:'#fed7aa', 300:'#fdba74', 400:'#fb923c', 500:'#f97316', 600:'#ea580c', 700:'#c2410c', 800:'#9a3412', 900:'#7c2d12' }},
+        rose: { name: 'Rose', colors: { 50:'#fff1f2', 100:'#ffe4e6', 200:'#fecdd3', 300:'#fda4af', 400:'#fb7185', 500:'#f43f5e', 600:'#e11d48', 700:'#be123c', 800:'#9f1239', 900:'#881337' }},
+        violet: { name: 'Royal', colors: { 50:'#f5f3ff', 100:'#ede9fe', 200:'#ddd6fe', 300:'#c4b5fd', 400:'#a78bfa', 500:'#8b5cf6', 600:'#7c3aed', 700:'#6d28d9', 800:'#5b21b6', 900:'#4c1d95' }},
+      };
+
+      /* ------------- Utilities ------------- */
       const todayStr = () => new Date().toISOString().slice(0, 10);
-      const currency = (n) => {
-        const num = Number(n || 0);
-        try {
-          return num
-            .toLocaleString(undefined, { style: "currency", currency: "BDT" })
-            .replace("BDT", "৳")
-            .trim();
-        } catch {
-          // Fallback for browsers that don't know BDT
-          return `৳${num.toLocaleString()}`;
-        }
-      };
-
-      // NEW: Function to format YYYY-MM to descriptive month name (REQUEST 1)
-      const formatMonth = (ym) => {
-          if (!ym || ym.length !== 7) return "N/A";
-          const [year, month] = ym.split('-');
-          // month is 1-based, so month - 1 is needed for Date constructor
-          const date = new Date(year, month - 1, 1); 
-          return date.toLocaleString('default', { month: 'long', year: 'numeric' });
-      };
-
-      // NEW: Function to convert amount to words (BDT specific, using Lakh/Crore)
+      const formatDisplayDate = (dateStr) => { if (!dateStr) return ""; const [y, m, d] = dateStr.split('-'); return `${d}-${m}-${y}`; };
+      const currency = (n) => { const num = Number(n || 0); try { return num.toLocaleString(undefined, { style: "currency", currency: "BDT" }).replace("BDT", "৳").trim(); } catch { return `৳${num.toLocaleString()}`; } };
+      const formatMonth = (ym) => { if (!ym || ym.length !== 7) return "N/A"; const [year, month] = ym.split('-'); const date = new Date(year, month - 1, 1); return date.toLocaleString('default', { month: 'long', year: 'numeric' }); };
       const amountToWords = (n) => {
-          if (typeof n !== 'number') {
-              n = Number(n);
-          }
-          if (isNaN(n) || n <= 0) {
-              return "Zero Taka Only";
-          }
-
+          if (typeof n !== 'number') { n = Number(n); }
+          if (isNaN(n) || n <= 0) { return "Zero Taka Only"; }
           const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
           const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
           const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -87,1674 +109,473 @@
               if (num < 20) return teens[num - 10] + ' ';
               if (num < 100) return tens[Math.floor(num / 10)] + ' ' + helper(num % 10);
               if (num < 1000) return units[Math.floor(num / 100)] + ' Hundred ' + helper(num % 100);
-              
               let words = '';
-              // Use Crore
-              if (num >= 10000000) {
-                  words += helper(Math.floor(num / 10000000)) + ' Crore ';
-                  num %= 10000000;
-              }
-              // Use Lakh
-              if (num >= 100000) {
-                  words += helper(Math.floor(num / 100000)) + ' Lakh ';
-                  num %= 100000;
-              }
-              if (num >= 1000) {
-                  words += helper(Math.floor(num / 1000)) + ' Thousand ';
-                  num %= 1000;
-              }
+              if (num >= 10000000) { words += helper(Math.floor(num / 10000000)) + ' Crore '; num %= 10000000; }
+              if (num >= 100000) { words += helper(Math.floor(num / 100000)) + ' Lakh '; num %= 100000; }
+              if (num >= 1000) { words += helper(Math.floor(num / 1000)) + ' Thousand '; num %= 1000; }
               words += helper(num);
               return words;
           }
-
           let totalAmount = Math.round(n * 100) / 100;
           let taka = Math.floor(totalAmount);
           let paisa = Math.round((totalAmount - taka) * 100);
-
-          let takaWords = helper(taka).trim();
-          let words = takaWords;
-          if (words) {
-              words += ' Taka';
-          } else {
-              words = '';
-          }
-
-          if (paisa > 0) {
-              if (words) {
-                  words += ' and ';
-              }
-              // Converting paisa to words is complex, using fraction for simplicity/accuracy
-              let paisaWords = helper(paisa).trim();
-              if (paisaWords) {
-                  words += paisaWords + ' Paisa';
-              } else {
-                  words += `${String(paisa).padStart(2, '0')}/100 Paisa`;
-              }
-          }
-
-          if (words) {
-              words += ' Only';
-          }
-
+          let words = helper(taka).trim();
+          if (words) words += ' Taka'; else words = '';
+          if (paisa > 0) { if (words) words += ' and '; let paisaWords = helper(paisa).trim(); if (paisaWords) words += paisaWords + ' Paisa'; else words += `${String(paisa).padStart(2, '0')}/100 Paisa`; }
+          if (words) words += ' Only';
           return words.replace(/\s+/g, ' ').trim() || "Zero Taka Only";
       };
-      const monthKey = (dateStr) => {
-        const d = new Date(dateStr);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; // YYYY-MM
-      };
-      const nextReceiptNo = (allPayments) => {
-        const yyyymm = monthKey(new Date().toISOString());
-        const prefix = `RC-${yyyymm}-`;
-        const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1;
-        return `${prefix}${String(count).padStart(4, "0")}`;
-      };
-      
-      // MODIFIED: Function to download with a static filename (Problem 2)
-      const download = (text) => {
-        const filename = "rental-erp-backup.json"; // Static filename
-        const blob = new Blob([text], { type: "application/json;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      };
-
+      const monthKey = (dateStr) => { const d = new Date(dateStr); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+      const nextReceiptNo = (allPayments) => { const yyyymm = monthKey(new Date().toISOString()); const prefix = `RC-${yyyymm}-`; const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1; return `${prefix}${String(count).padStart(4, "0")}`; };
+      const download = (text) => { const filename = "rental-erp-backup.json"; const blob = new Blob([text], { type: "application/json;charset=utf-8;" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); };
       const classNames = (...c) => c.filter(Boolean).join(" ");
+      if (!(window.crypto && window.crypto.randomUUID)) { window.crypto = window.crypto || {}; window.crypto.randomUUID = function () { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { const r = (Math.random() * 16) | 0; const v = c === 'x' ? r : (r & 0x3) | 0x8; return v.toString(16); }); }; }
+      const shouldShowReminder = (dueDay) => { const today = new Date(); const currentDay = today.getDate(); return Math.abs(currentDay - Number(dueDay)) === 2; }
+      const createWhatsAppLink = (tenantPhone, unitName, orgName, dueDay, rentAmount) => { if (!tenantPhone || !unitName) return null; const phone = tenantPhone.replace(/\D/g, ''); const rent = currency(rentAmount); const message = `*Rent Reminder from ${orgName}*\n\nDear tenant of ${unitName},\n\nThis is a friendly reminder that your monthly rent of ${rent} is due in 2 days (on the ${dueDay}th of the month).\n\nPlease make the payment before the due date.\nThank you!`; return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`; };
 
-      if (!(window.crypto && window.crypto.randomUUID)) {
-        window.crypto = window.crypto || {};
-        window.crypto.randomUUID = function () {
-          // RFC4122 v4-ish
-          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = (Math.random() * 16) | 0;
-            const v = c === 'x' ? r : (r & 0x3) | 0x8;
-            return v.toString(16);
-          });
-        };
-      }
-      
-      // Utility function to check for reminder
-      const shouldShowReminder = (dueDay) => {
-          const today = new Date();
-          const currentDay = today.getDate();
-          
-          // Simplified check: is today the day 2 days before the dueDay?
-          return Math.abs(currentDay - Number(dueDay)) === 2;
-      }
-      
-      // Utility function to generate WhatsApp link
-      const createWhatsAppLink = (tenantPhone, unitName, orgName, dueDay, rentAmount) => {
-          if (!tenantPhone || !unitName) return null;
-          // Clean phone number (remove +, spaces, dashes, etc.)
-          const phone = tenantPhone.replace(/\D/g, '');
-          const rent = currency(rentAmount);
-          
-          const message = `*Rent Reminder from ${orgName}*\n\nDear tenant of ${unitName},\n\nThis is a friendly reminder that your monthly rent of ${rent} is due in 2 days (on the ${dueDay}th of the month).\n\nPlease make the payment before the due date.\nThank you!`;
-          const encodedMessage = encodeURIComponent(message);
-          
-          return `https://wa.me/${phone}?text=${encodedMessage}`;
-      };
-
-
-      /* ------------- Demo initial data (unchanged) ------------- */
+      /* ------------- Initial Data ------------- */
       const initialData = {
-        org: {
-          name: "Shahjaha chowdhury Bari",
-          address: "House: 383, Road: 13, Block: J, Bashundhara R/A, Dhaka-1230",
-          phone: "+8801749333661",
-          email: "Foyaz.islam@yahoo.com",
-          note: "Thank you for your payment!",
-     
-        },
-        units: [
-          ...Array.from({ length: 10 }).map((_, i) => ({
-            id: `F${i + 1}`,
-            type: "Flat",
-            name: `Flat ${i + 1}`,
-            floor: Math.ceil((i + 1) / 2),
-           
-            rent: 15000,
-            dueDay: 5,
-            tenant: "",
-            tenantPhone: "", 
-            tenantPhotoUrl: "", 
-            tenantNidUrl: "", 
-            rentAgreementUrl: "", 
-            enableReminder: true, 
-  
-          })),
-          ...Array.from({ length: 5 }).map((_, i) => ({
-            id: `S${i + 1}`,
-            type: "Shop",
-            name: `Shop ${i + 1}`,
-            floor: 0,
-            rent: 25000,
-      
-            dueDay: 5,
-            tenant: "",
-            tenantPhone: "", 
-            tenantPhotoUrl: "", 
-            tenantNidUrl: "", 
-            rentAgreementUrl: "", 
-            enableReminder: true, 
-          
-          })),
-        ],
-        payments: [], 
-        expenses: []
+        org: { name: "Shahjaha chowdhury Bari", address: "House: 383, Road: 13, Block: J, Bashundhara R/A, Dhaka-1230", phone: "+8801749333661", email: "Foyaz.islam@yahoo.com", note: "Thank you for your payment!", },
+        settings: { theme: 'indigo', darkMode: false },
+        units: [ ...Array.from({ length: 10 }).map((_, i) => ({ id: `F${i + 1}`, type: "Flat", name: `Flat ${i + 1}`, floor: Math.ceil((i + 1) / 2), rent: 15000, dueDay: 5, tenant: "", tenantPhone: "", tenantPhotoUrl: "", tenantNidUrl: "", rentAgreementUrl: "", enableReminder: true, })), ...Array.from({ length: 5 }).map((_, i) => ({ id: `S${i + 1}`, type: "Shop", name: `Shop ${i + 1}`, floor: 0, rent: 25000, dueDay: 5, tenant: "", tenantPhone: "", tenantPhotoUrl: "", tenantNidUrl: "", rentAgreementUrl: "", enableReminder: true, })), ],
+        payments: [], expenses: []
       };
-      /* ------------- Cloud Storage Functions (unchanged) ------------- */
+
+      /* ------------- Cloud Storage ------------- */
       const localStorageKey = "rental_erp_v1";
-      // MODIFIED: loadData now accepts uid or defaults to a test ID
-      const loadData = async (uid = "TEST_USER_ID") => {
-        try {
-          // Check for old localStorage data for one-time migration
-          const rawLocal = localStorage.getItem(localStorageKey);
-          if (rawLocal) {
-            console.log("Found data in localStorage. Attempting cloud migration.");
-            const parsed = JSON.parse(rawLocal);
-            // Save it to Firestore immediately
-            await saveData(parsed, uid);
-            // Clear local storage after successful migration
-            localStorage.removeItem(localStorageKey);
-            alert("Local data migrated to the cloud successfully! It will now sync across devices.");
-            return { ...initialData, ...parsed };
-          }
+      const loadData = async (uid = "TEST_USER_ID") => { try { const rawLocal = localStorage.getItem(localStorageKey); if (rawLocal) { const parsed = JSON.parse(rawLocal); await saveData(parsed, uid); localStorage.removeItem(localStorageKey); alert("Local data migrated to the cloud successfully!"); return { ...initialData, ...parsed }; } const docPath = `erp_data/${uid}`; const docRef = db.doc(docPath); const doc = await docRef.get(); if (doc.exists) return { ...initialData, ...doc.data() }; await saveData(initialData, uid); return initialData; } catch (e) { console.error("Cloud Load error", e); return initialData; } };
+      const saveData = async (data, uid = "TEST_USER_ID") => { if (!uid) return; try { const docPath = `erp_data/${uid}`; await db.doc(docPath).set({ org: data.org, settings: data.settings || { theme: 'indigo', darkMode: false }, units: data.units, payments: data.payments, expenses: data.expenses, }); } catch (e) { console.error("Cloud Save error", e); alert("Warning: Data failed to save to the cloud."); } };
+      const uploadFile = async (file, unitId, type) => { const storageRef = storage.ref(); const path = `tenant_docs/${unitId}/${type}/${file.name}`; const snapshot = await storageRef.child(path).put(file); return await snapshot.ref.getDownloadURL(); };
 
-          // Load from Firestore (using UID to scope the document path)
-          const docPath = `erp_data/${uid}`;
-          const docRef = db.doc(docPath);
-          const doc = await docRef.get();
-
-          if (doc.exists) {
-            console.log("Data loaded from cloud storage.");
-            // Merge with initialData to ensure new fields are present
-            return { ...initialData, ...doc.data() };
-          }
-
-          console.log("No cloud data found. Saving initial demo data to cloud.");
-          // Initial save of demo data to the cloud
-          await saveData(initialData, uid);
-          return initialData;
-
-        } catch (e) {
-          console.error("Cloud Load error. Returning initial data.", e);
-          // If load fails, we return initial data and the app will try to save on next change.
-          return initialData;
-        }
-      };
-
-      // MODIFIED: saveData now accepts uid or defaults to a test ID
-      const saveData = async (data, uid = "TEST_USER_ID") => {
-        if (!uid) {
-            console.error("Cannot save data: User ID is missing.");
-            return;
-        }
-        try {
-          // Use UID in the document path for user-specific data
-          const docPath = `erp_data/${uid}`;
-          const docRef = db.doc(docPath);
-          
-          const dataToSave = {
-            org: data.org,
-            units: data.units,
-            payments: data.payments,
-            expenses: data.expenses,
-          };
-          await docRef.set(dataToSave);
-          console.log(`Data saved to cloud successfully for user: ${uid}.`);
-        } catch (e) {
-          console.error("Cloud Save error.", e);
-          alert("Warning: Data failed to save to the cloud. You are working offline and data will not sync.");
-        }
-      };
-
-      // NEW: Utility to upload file to Firebase Storage
-      const uploadFile = async (file, unitId, type) => {
-          const storageRef = storage.ref();
-          // Use a simple path structure
-          const path = `tenant_docs/${unitId}/${type}/${file.name}`;
-          const fileRef = storageRef.child(path);
-          
-          console.log(`Uploading ${type} for ${unitId}...`);
-          
-          const snapshot = await fileRef.put(file);
-          const downloadURL = await snapshot.ref.getDownloadURL();
-          console.log(`Upload successful. URL: ${downloadURL}`);
-          return downloadURL;
-      };
-
-
-      /* ------------- UI primitives (MODIFIED - Input/Select/Checkbox fixed for Babel) ------------- */
+      /* ------------- Mobile-Optimized Components ------------- */
       const Section = ({ title, right, children }) => (
-        <div className="bg-white rounded-2xl shadow p-4 md:p-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg md:text-xl font-semibold">{title}</h2>
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 transition-all duration-200 hover:shadow-md">
+          <div className="flex flex-wrap items-center justify-between mb-4 gap-2">
+            <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100">{title}</h2>
             {right}
           </div>
-        
           {children}
         </div>
       );
-      
-      // MODIFIED: Use explicit return for better compatibility with browser-Babel
+
       const Input = (props) => {
         return (
           <input
             {...props}
+            min={props.type === 'number' ? "0" : undefined}
             className={classNames(
-              "w-full rounded-xl border px-3 py-2 text-sm md:text-base",
-              "focus:outline-none focus:ring-2 focus:ring-indigo-400",
+              "w-full rounded-lg border px-3 py-3 text-base shadow-sm transition-colors", // Text-base ensures 16px font on mobile
+              "border-slate-300 bg-white text-slate-700 placeholder:text-slate-400",
+              "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500",
+              "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",
+              "disabled:bg-slate-50 dark:disabled:bg-slate-900 disabled:text-slate-500",
               props.className
             )}
           />
         );
       };
 
-      // MODIFIED: Use explicit return for better compatibility with browser-Babel
       const Select = (props) => {
         return (
-          <select
-            {...props}
-            className={classNames(
-              "w-full rounded-xl border px-3 py-2 text-sm md:text-base",
-              "focus:outline-none focus:ring-2 focus:ring-indigo-400",
-              props.className
-            )}
-          />
+          <div className="relative w-full">
+            <select
+              {...props}
+              className={classNames(
+                "w-full rounded-lg border px-3 py-3 text-base shadow-sm appearance-none transition-colors",
+                "border-slate-300 bg-white text-slate-700",
+                "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100",
+                "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",
+                props.className
+              )}
+            />
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+              <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+            </div>
+          </div>
         );
       };
-   
-        
 
       const Button = ({ children, variant = "primary", className, ...rest }) => {
         const styles = {
-          primary: "bg-indigo-600 text-white hover:bg-indigo-700",
-          secondary: "bg-slate-100 hover:bg-slate-200",
-          danger: "bg-rose-600 text-white hover:bg-rose-700",
-          ghost: "bg-transparent hover:bg-slate-100",
+          primary: "bg-indigo-600 text-white active:bg-indigo-700 active:scale-95",
+          secondary: "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 active:bg-slate-50 active:scale-95",
+          danger: "bg-rose-600 text-white active:bg-rose-700 active:scale-95",
+          ghost: "bg-transparent active:bg-slate-100 dark:active:bg-slate-800 text-slate-600 dark:text-slate-300",
         };
         return (
           <button
             {...rest}
             className={classNames(
-              "rounded-xl px-4 py-2 text-sm md:text-base transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
+              "rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation select-none",
               styles[variant],
               className
             )}
-   
           >
             {children}
           </button>
         );
       };
       
-      // MODIFIED: Use explicit return for better compatibility with browser-Babel (FIX)
-      const Checkbox = (props) => { 
-        return (
-          <div className="flex items-center">
-              <input type="checkbox" 
-                  {...props}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
-              />
-              {props.label && <label htmlFor={props.id} 
-                className="ml-2 text-sm text-slate-700">{props.label}</label>}
+      const Checkbox = (props) => (
+          <div className="flex items-center py-2">
+              <input type="checkbox" {...props} className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+              {props.label && <label htmlFor={props.id} className="ml-3 text-sm text-slate-700 dark:text-slate-300 select-none">{props.label}</label>}
           </div>
-        );
-      };
-      // NEW: Custom File Upload Component
+      );
+
       function FileUpload({ label, urlKey, unitId, setUnitForm, currentUrl }) {
           const [uploading, setUploading] = useState(false);
           const fileInputRef = useRef(null);
-
           const handleFileChange = async (event) => {
               const file = event.target.files[0];
               if (!file) return;
-
               setUploading(true);
               try {
-                  // FIX: Pass the correct 'type' (which is the urlKey) for the storage path
                   const type = urlKey.replace('tenant', '').replace('Nid', 'NID').replace('Agreement', 'Agreement');
                   const url = await uploadFile(file, unitId, type);
-                  // Update the unit form state with the new URL
                   setUnitForm(f => ({ ...f, [`${urlKey}Url`]: url }));
-                  alert(`${label} uploaded successfully!`);
-              } catch (error) {
-                  console.error("Upload failed:", error);
-                  alert(`Upload failed for ${label}. Check console for details. Ensure you have enabled Firebase Storage and the security rules allow public writes.`);
-              } finally {
-                  setUploading(false);
-                  // Reset file input to allow uploading the same file again
-                  if (fileInputRef.current) {
-                      fileInputRef.current.value = null;
-                  }
-              }
+                  alert(`${label} uploaded!`);
+              } catch (error) { alert(`Upload failed.`); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = null; }
           };
           return (
-              <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700 block">{label}</label>
-                  <input 
-                      type="file" 
-                    
-                      ref={fileInputRef}
-                      onChange={handleFileChange} 
-                      disabled={uploading || !unitId} 
-                      className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                
+              <div className="space-y-1 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</label>
+                  <div className="flex items-center gap-2">
+                      <input 
+                          type="file" ref={fileInputRef} onChange={handleFileChange} disabled={uploading || !unitId} 
+                          className="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-2 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900 dark:file:text-indigo-200 hover:file:bg-indigo-100"
                       />
-                  {!unitId && <p className="text-xs text-rose-500">Save unit first to enable upload.</p>}
-                  {currentUrl && (
-                      <div className="flex items-center text-xs text-emerald-600">
-                         
-                        <span className="mr-2">✅ File uploaded.</span>
-                          <a href={currentUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-700">View Document</a>
-                      </div>
-                  )}
-                  {uploading && <p className="text-sm text-indigo-600">Uploading... 
-              Please wait.</p>}
+                      {currentUrl && (
+                          <a href={currentUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700" title="View Document">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" /></svg>
+                          </a>
+                      )}
+                  </div>
+                  {!unitId && <p className="text-xs text-rose-500">Save unit to upload.</p>}
+                  {uploading && <p className="text-xs text-indigo-600 animate-pulse">Uploading...</p>}
               </div>
           );
       }
       
-      /* ------------- Main App (UPDATED) ------------- */
-      // MODIFIED: currentUser can be null/undefined for testing bypass
+      /* ------------- Main App ------------- */
       function App({ currentUser }) {
         const [data, setData] = useState(initialData);
         const [tab, setTab] = useState("dashboard");
         const [search, setSearch] = useState("");
-        const [showReceipt, setShowReceipt] = useState(null); 
-        // ... existing state definitions
-    const [loading, setLoading] = useState(true);
-    
-    // NEW: State for password protection
-    const [deleteRequest, setDeleteRequest] = useState(null); // { type: 'payment'|'expense', id: string }
-    const [showSettingsPrompt, setShowSettingsPrompt] = useState(false);
-    
-    // MODIFIED: Use a test UID if currentUser is null/undefined
-    const uid = currentUser?.uid || "TEST_USER_ID"; 
-    
-    // ... existing saveToCloud definition ...
+        const [showReceipt, setShowReceipt] = useState(null);
+        const [loading, setLoading] = useState(true);
+        const [deleteRequest, setDeleteRequest] = useState(null); 
+        const [showSettingsPrompt, setShowSettingsPrompt] = useState(false);
+        const uid = currentUser?.uid || "TEST_USER_ID";
 
-    // NEW: Function to check password via Firebase re-authentication (using login password)
-    const isPasswordCorrect = async (password) => {
-        if (!currentUser?.email) {
-            console.error("No user email available for password check.");
-            return false;
-        }
-        try {
-            // Re-sign in with email and password
-            await auth.signInWithEmailAndPassword(currentUser.email, password);
-            return true;
-        } catch (error) {
-            console.log("Password check failed:", error.code, error.message);
-            return false;
-        }
-    };
-    
-// ... existing useEffects for data fetching/persistence ...
-
-// ... existing data structure access and helper functions (updateOrg, addPayment, etc.) ...
-    
-    // NEW: Deletion handlers - Called AFTER password verification
-    const deletePayment = (id) => {
-        setData((d) => ({ ...d, payments: d.payments.filter((p) => p.id !== id) }));
-        setDeleteRequest(null);
-        alert("Payment deleted successfully.");
-    };
-    const deleteExpense = (id) => {
-        setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) }));
-        setDeleteRequest(null);
-        alert("Expense deleted successfully.");
-    };
-// ...// 1. Initial data fetch from cloud
         useEffect(() => {
-            setLoading(true);
-            // Pass UID to loadData
-            loadData(uid).then(initialData => {
-                setData(initialData);
-        
-                setLoading(false);
-            });
-        }, [uid]);
-        // Re-run when UID changes (though it shouldn't once logged in)
+            const settings = data.settings || { theme: 'indigo', darkMode: false };
+            const themeKey = settings.theme || 'indigo';
+            const themeColors = THEMES[themeKey]?.colors || THEMES.indigo.colors;
+            const root = document.documentElement;
+            Object.entries(themeColors).forEach(([shade, value]) => { root.style.setProperty(`--theme-${shade}`, value); });
+            if (settings.darkMode) { root.classList.add('dark'); } else { root.classList.remove('dark'); }
+        }, [data.settings]);
 
-        // 2. Data Persistence (Debounced Cloud Save)
+        const updateSettings = (patch) => { setData(d => ({ ...d, settings: { ...(d.settings || {}), ...patch } })); };
+        const isPasswordCorrect = async (password) => { if (!currentUser?.email) return false; try { await auth.signInWithEmailAndPassword(currentUser.email, password); return true; } catch { return false; } };
+        const deletePayment = (id) => { setData((d) => ({ ...d, payments: d.payments.filter((p) => p.id !== id) })); setDeleteRequest(null); alert("Payment deleted."); };
+        const deleteExpense = (id) => { setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) })); setDeleteRequest(null); alert("Expense deleted."); };
+
+        useEffect(() => { setLoading(true); loadData(uid).then(init => { setData(init); setLoading(false); }); }, [uid]);
         const saveTimeout = useRef(null);
-        useEffect(() => {
-          if (loading || !uid) return; // Do not save until initial load is complete or if no UID
+        useEffect(() => { if (loading || !uid) return; if (saveTimeout.current) clearTimeout(saveTimeout.current); saveTimeout.current = setTimeout(() => { saveData(data, uid); }, 500); return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); }; }, [data, loading, uid]);
 
-          if (saveTimeout.current) {
-            clearTimeout(saveTimeout.current);
-          }
-
-          // Set a new timeout to save data after a small delay (500ms)
-          saveTimeout.current = setTimeout(() => {
- 
-            saveData(data, uid); // Pass UID to saveData
-          }, 500); 
-
-          return () => {
-            if (saveTimeout.current) {
-              clearTimeout(saveTimeout.current);
-            }
-          };
+        const units = data.units; const payments = data.payments; const expenses = data.expenses; const org = data.org;
+        const totals = useMemo(() => { const income = payments.reduce((s, p) => s + Number(p.amount || 0), 0); const expense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0); return { income, expense, net: income - expense }; }, [payments, expenses]);
+        const outstandingByUnit = useMemo(() => { const now = new Date(); const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; const map = Object.fromEntries(units.map((u) => [u.id, u.rent || 0])); payments.filter((p) => (p.forMonth || "").startsWith(ym)).forEach((p) => { map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0); }); return map; }, [units, payments]);
+        const filteredUnits = useMemo(() => { if (!search) return units; const q = search.toLowerCase(); return units.filter((u) => u.id.toLowerCase().includes(q) || u.name.toLowerCase().includes(q) || (u.tenant || "").toLowerCase().includes(q)); }, [units, search]);
+        const unitsForReminder = useMemo(() => { if (!org.name) return []; const now = new Date(); const currentMonthKey = monthKey(now.toISOString()); const paidForCurrentMonth = payments.filter(p => (p.forMonth || "").startsWith(currentMonthKey)).reduce((acc, p) => { acc[p.unitId] = (acc[p.unitId] || 0) + Number(p.amount || 0); return acc; }, {}); return units.filter(u => { if (!u.enableReminder || !u.tenantPhone || !u.rent) return false; if (!shouldShowReminder(u.dueDay)) return false; return (paidForCurrentMonth[u.id] || 0) < (u.rent || 0); }).map(u => ({ ...u, whatsappLink: createWhatsAppLink(u.tenantPhone, u.name, org.name, u.dueDay, u.rent) })); }, [units, org, payments]);
         
-        }, [data, loading, uid]);
-
-
-        const units = data.units;
-        const payments = data.payments;
-        const expenses = data.expenses;
-        const org = data.org;
-        const totals = useMemo(() => {
-          const income = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-          const expense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-          return { income, expense, net: income - expense };
-        }, [payments, expenses]);
-        
-        const outstandingByUnit = useMemo(() => {
-          const now = new Date();
-          const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-          const map = Object.fromEntries(units.map((u) => [u.id, u.rent || 0]));
-          payments
-            .filter((p) => (p.forMonth || "").startsWith(ym))
-            .forEach((p) => {
-       
-              map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0);
-            });
-          return map; // positive means due
-        }, [units, payments]);
-        
-        const filteredUnits = useMemo(() => {
-          if (!search) return units;
-          const q = search.toLowerCase();
-          return units.filter(
-            (u) =>
-              u.id.toLowerCase().includes(q) ||
-              u.name.toLowerCase().includes(q) ||
-              (u.tenant 
-                || "").toLowerCase().includes(q) ||
-              (u.type || "").toLowerCase().includes(q)
-          );
-        }, [units, search]);
-        
-        // MODIFIED: Reminder logic to check if unit has a paid receipt for the current month (Problem 1)
-        const unitsForReminder = useMemo(() => {
-            if (!org.name) return []; 
-
-            const now = new Date();
-            const currentMonthKey = monthKey(now.toISOString());
-
-            // Get total paid for the current month by unit ID
-            const paidForCurrentMonth = payments
-                .filter(p => (p.forMonth || "").startsWith(currentMonthKey))
-                .reduce((acc, p) => {
-                    acc[p.unitId] = (acc[p.unitId] || 0) + Number(p.amount || 0);
-                    return acc;
-                }, {});
-
-            return units.filter(u => {
-                const isReminderEnabled = u.enableReminder && u.tenantPhone && u.rent > 0;
-                if (!isReminderEnabled) return false;
-
-                const isReminderDay = u.dueDay >= 1 && u.dueDay <= 31 && shouldShowReminder(u.dueDay);
-                if (!isReminderDay) return false;
-
-                // Check if the full rent has been paid for the current month
-                const rentPaid = paidForCurrentMonth[u.id] || 0;
-                // Only show reminder if the full rent hasn't been paid
-                const isFullyPaid = rentPaid >= (u.rent || 0);
-                
-                return !isFullyPaid;
-
-            }).map(u => ({
-                ...u,
-                whatsappLink: createWhatsAppLink(u.tenantPhone, u.name, org.name, u.dueDay, u.rent)
-            }));
-      
-          }, [units, org, payments]);
-        
-        // Data helpers
         const updateOrg = (patch) => setData((d) => ({ ...d, org: { ...d.org, ...patch } }));
-        const upsertUnit = (unit) =>
-          setData((d) => ({
-            ...d,
-            units: d.units.some((x) => x.id === unit.id)
-              ? d.units.map((x) => (x.id === unit.id ? { ...x, ...unit } : x))
-              : [...d.units, unit],
-          }));
+        const upsertUnit = (unit) => setData((d) => ({ ...d, units: d.units.some((x) => x.id === unit.id) ? d.units.map((x) => (x.id === unit.id ? { ...x, ...unit } : x)) : [...d.units, unit] }));
         const deleteUnit = (id) => setData((d) => ({ ...d, units: d.units.filter((u) => u.id !== id) }));
-        const addPayment = (p) =>
-          setData((d) => ({ ...d, payments: [{ ...p, id: crypto.randomUUID() }, ...d.payments] }));
-        // MODIFIED: Export function to use the simplified download function
+        const addPayment = (p) => setData((d) => ({ ...d, payments: [{ ...p, id: crypto.randomUUID() }, ...d.payments] }));
+        const addExpense = (e) => setData((d) => ({ ...d, expenses: [{ ...e, id: crypto.randomUUID() }, ...d.expenses] }));
         const exportData = () => download(JSON.stringify(data, null, 2));
-        const addExpense = (e) =>
-          setData((d) => ({ ...d, expenses: [{ ...e, id: crypto.randomUUID() }, ...d.expenses] }));
-        const importData = (file) => {
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            try {
-              const parsed = JSON.parse(evt.target.result);
-              setData(parsed);
-              alert("Import successful ✅");
-            } catch (e) {
-              alert("Import failed: invalid JSON");
-            }
-          };
-          reader.readAsText(file);
-        };
-        // Reset / data management actions for Settings
-        const clearOrgFields = () =>
-          setData((d) => ({ ...d, org: { name: "", address: "", phone: "", email: "", note: "" } }));
-        const restoreDemoOrg = () =>
-          setData((d) => ({ ...d, org: { ...initialData.org } }));
-        const clearPayments = () =>
-          setData((d) => ({ ...d, payments: [] }));
-        const clearExpenses = () =>
-          setData((d) => ({ ...d, expenses: [] }));
-        const factoryReset = () => {
-          setData({ ...initialData });
-        };
-        // Auth Action (kept for completeness, but Sign Out button removed in Koder version)
-        const handleSignOut = async () => {
-            try {
-                await auth.signOut();
-            } catch (e) {
-                console.error("Sign out error:", e);
-                alert("Failed to sign out.");
-            }
-        };
+        const importData = (file) => { const reader = new FileReader(); reader.onload = (evt) => { try { setData(JSON.parse(evt.target.result)); alert("Import successful ✅"); } catch { alert("Import failed: invalid JSON"); } }; reader.readAsText(file); };
+        const clearOrgFields = () => setData((d) => ({ ...d, org: { name: "", address: "", phone: "", email: "", note: "" } }));
+        const restoreDemoOrg = () => setData((d) => ({ ...d, org: { ...initialData.org } }));
+        const clearPayments = () => setData((d) => ({ ...d, payments: [] }));
+        const clearExpenses = () => setData((d) => ({ ...d, expenses: [] }));
+        const factoryReset = () => { setData({ ...initialData }); };
+        const handleSignOut = async () => { try { await auth.signOut(); } catch { alert("Failed to sign out."); } };
+
         return (
-          <div className="min-h-screen bg-slate-50 text-slate-800">
-            {loading && (
-              <div className="fixed inset-0 bg-white/70 z-50 flex flex-col items-center justify-center p-8 text-center">
-                <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                 <div className="text-xl font-semibold text-indigo-600 mt-4">Loading Data from Cloud...</div>
- 
-                 <div className="text-sm text-slate-500 mt-2">Connecting to Firebase to sync your data.</div>
-              </div>
-            )}
-            <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
-              <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-2">
-          
-                <div className="text-xl md:text-2xl font-bold">🏢 {data.org.name}</div>
-                <div className="ml-auto flex items-center gap-2">
-                    <span className="text-xs text-slate-500 hidden sm:inline">User: {currentUser?.email || 'TEST MODE'}</span>
-                  <Button variant="secondary" onClick={exportData}>⤓ Export</Button>
-                  <label className="cursor-pointer">
-     
-                    <span className="inline-block bg-slate-100 hover:bg-slate-200 rounded-xl px-4 py-2 text-sm">Import</span>
-                    <input className="hidden" type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} />
-                  </label>
-                  {/* NOTE: Sign Out button removed for Koder testing - uncomment the line below to restore it if you re-add AuthStatusWrapper */}
-                  {currentUser && <Button variant="danger" onClick={handleSignOut} className="ml-2">Sign Out</Button>}
+          <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 pb-safe-bottom transition-colors duration-300">
+            {loading && <div className="fixed inset-0 bg-white/80 dark:bg-slate-900/80 z-50 flex items-center justify-center backdrop-blur-sm"><div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>}
+            
+            <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300">
+              <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-sm"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></div>
+                    <div className="font-bold text-lg md:text-xl text-slate-800 dark:text-white truncate max-w-[200px] md:max-w-md">{data.org.name || "RMS"}</div>
                 </div>
+                {currentUser && <Button variant="secondary" onClick={handleSignOut} className="text-xs">Sign Out</Button>}
               </div>
-          
-              <nav className="mx-auto max-w-6xl px-2 pb-3">
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-       
-                   {[
-                    ["dashboard", "Dashboard"],
-                    ["units", "Units"],
-                    ["payments", "Payments"],
-                    ["newReceipt", "New Receipt"],
-                    ["statement", "Statement"], // ADDED: New Statement tab
-                    ["expenses", "Expenses"],
-                    ["settings", "Settings"],
-                  ].map(([key, label]) => (
-                    <Button
-                     
-                      key={key}
-                      variant={tab === key ? "primary" : "secondary"}
-                      className="w-full"
-                      onClick={() => {
-                          // Only prompt if key is 'settings' AND user is logged in (not TEST_USER)
-                          if (key === 'settings' && currentUser) {
-                              setShowSettingsPrompt(true);
-                          } else {
-                              setTab(key);
-                          }
-                      }}
-                      disabled={loading} 
-                    >
-         
+              <nav className="mx-auto max-w-6xl px-4 pb-0 overflow-x-auto no-scrollbar">
+                <div className="flex gap-2 min-w-max pb-3">
+                   {[ ["dashboard", "Dashboard"], ["units", "Units"], ["payments", "Payments"], ["newReceipt", "+ Receipt"], ["statement", "Statement"], ["expenses", "Expenses"], ["settings", "Settings"], ].map(([key, label]) => (
+                    <button key={key} onClick={() => { if (key === 'settings' && currentUser) setShowSettingsPrompt(true); else setTab(key); }}
+                      className={classNames("px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap active:scale-95", tab === key ? "bg-indigo-600 text-white shadow-md" : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 bg-slate-100/50 dark:bg-slate-800")}>
                       {label}
-                    </Button>
+                    </button>
                   ))}
                 </div>
               </nav>
             </header>
 
-       
-            <main className="mx-auto max-w-6xl p-4 space-y-4 md:space-y-6">
-              {tab === "dashboard" && (
-                <DashboardSection 
-                    totals={totals} 
-                    units={units} 
-                    outstandingByUnit={outstandingByUnit} 
-                    unitsForReminder={unitsForReminder} 
-                    setTab={setTab} 
-                />
-              )}
-
-              {tab === "units" && (
-                <Section
-  
-                  title="Units (Flats & Shops)"
-                  right={<Input placeholder="Search units/tenant…" value={search} onChange={(e) => setSearch(e.target.value)} />}
-                >
-                  <UnitsTable units={filteredUnits} upsertUnit={upsertUnit} deleteUnit={deleteUnit} />
-                </Section>
-  
-              )}
-
-              {tab === "payments" && (
-                          <Section title="Payments">
-                              <PaymentsTable 
-                                  payments={payments} 
-                                  units={units} 
-                                  onRowClick={setShowReceipt} 
-                                  onDelete={(id) => setDeleteRequest({ type: 'payment', id })} // <-- ADD THIS LINE
-                              />
-                          </Section>
-                      )}
-
-              {tab === "newReceipt" && (
-                <Section title="Create Money Receipt">
-                  <NewReceiptForm units={units} addPayment={addPayment} data={data} />
-                </Section>
-              )}
-              
-              {/* ADDED: New Statement Tab (REQUEST 2) */}
-              {tab === "statement" && (
-                <Section title="Income & Expense Statement">
-                    <DateRangeStatement payments={payments} expenses={expenses} />
-                </Section>
-              )}
-
-       
-              {tab === "expenses" && (
-                          <Section title="Expenses">
-                              <ExpensesSection 
-                                  expenses={expenses} 
-                                  addExpense={addExpense} 
-                                  onDeleteExpense={(id) => setDeleteRequest({ type: 'expense', id })} // <-- ADD THIS LINE
-                              />
-                          </Section>
-                      )}
-
-              {tab === "settings" && 
-   
-                (
-                <Section title="Organization Settings">
-                  <OrgSettings
-                    org={data.org}
-                    updateOrg={updateOrg}
-             
-                    clearOrgFields={clearOrgFields}
-                    restoreDemoOrg={restoreDemoOrg}
-                    clearPayments={() => { if (confirm("Clear ALL payments? This will remove every receipt...")) clearPayments(); }}
-                    clearExpenses={() => { if (confirm("Clear ALL expenses? This will remove every expense entry...")) clearExpenses(); }}
-                    factoryReset={() => { if (confirm("DANGER: Factory Reset? This will delete all your data and restore the demo data.")) factoryReset(); }}
-                  />
-                </Section>
-              )}
-
-              {showReceipt && (
-                <ReceiptModal 
-                  org={data.org} 
-                  payment={showReceipt} 
-                  unit={units.find((u) => u.id === showReceipt.unitId)} 
-                  onClose={() => setShowReceipt(null)} 
-                />
-              )}
-
+            <main className="mx-auto max-w-6xl p-4 space-y-6 pb-24 md:pb-12">
+              {tab === "dashboard" && <DashboardSection totals={totals} units={units} outstandingByUnit={outstandingByUnit} unitsForReminder={unitsForReminder} setTab={setTab} />}
+              {tab === "units" && <Section title="Manage Units" right={<Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-48" />}><UnitsTable units={filteredUnits} upsertUnit={upsertUnit} deleteUnit={deleteUnit} /></Section>}
+              {tab === "payments" && <Section title="Transaction History"><PaymentsTable payments={payments} units={units} onRowClick={setShowReceipt} onDelete={(id) => setDeleteRequest({ type: 'payment', id })} /></Section>}
+              {tab === "newReceipt" && <Section title="New Money Receipt"><NewReceiptForm units={units} addPayment={addPayment} data={data} /></Section>}
+              {tab === "statement" && <Section title="Financial Statement"><DateRangeStatement payments={payments} expenses={expenses} /></Section>}
+              {tab === "expenses" && <Section title="Expense Tracker"><ExpensesSection expenses={expenses} addExpense={addExpense} onDeleteExpense={(id) => setDeleteRequest({ type: 'expense', id })} /></Section>}
+              {tab === "settings" && <Section title="System Settings"><OrgSettings org={data.org} settings={data.settings} updateOrg={updateOrg} updateSettings={updateSettings} clearOrgFields={clearOrgFields} restoreDemoOrg={restoreDemoOrg} clearPayments={() => { if (confirm("Clear ALL payments?")) clearPayments(); }} clearExpenses={() => { if (confirm("Clear ALL expenses?")) clearExpenses(); }} factoryReset={() => { if (confirm("Factory Reset?")) factoryReset(); }} exportData={exportData} importData={importData} /></Section>}
+              {showReceipt && <ReceiptModal org={data.org} payment={showReceipt} unit={units.find((u) => u.id === showReceipt.unitId)} onClose={() => setShowReceipt(null)} />}
             </main>
-             
 
-                  {/* NEW: Password protection modal for Settings and Deletion */}
-                  {(showSettingsPrompt || deleteRequest) && (
-                      <PasswordPromptModal 
-                          currentUser={currentUser}
-                          isPasswordCorrect={isPasswordCorrect}
-                          onClose={() => { 
-                              setShowSettingsPrompt(false); 
-                              setDeleteRequest(null); 
-                          }}
-                          onSuccess={() => {
-                              if (showSettingsPrompt) {
-                                  // Successful entry for Settings
-                                  setTab('settings');
-                                  setShowSettingsPrompt(false);
-                              } else if (deleteRequest) {
-                                  // Successful entry for Deletion
-                                  if (deleteRequest.type === 'payment') {
-                                      deletePayment(deleteRequest.id);
-                                  } else if (deleteRequest.type === 'expense') {
-                                      deleteExpense(deleteRequest.id);
-                                  }
-                              }
-                          }}
-                          actionLabel={
-                              showSettingsPrompt ? "Access Settings" : 
-                              deleteRequest?.type === 'payment' ? "Delete Payment" : 
-                              deleteRequest?.type === 'expense' ? "Delete Expense" : "Authorize Action"
-                          }
-                      />
-                  )}
-                  
-              </div>
-          );
+            {(showSettingsPrompt || deleteRequest) && <PasswordPromptModal currentUser={currentUser} isPasswordCorrect={isPasswordCorrect} onClose={() => { setShowSettingsPrompt(false); setDeleteRequest(null); }} onSuccess={() => { if (showSettingsPrompt) { setTab('settings'); setShowSettingsPrompt(false); } else if (deleteRequest) { if (deleteRequest.type === 'payment') deletePayment(deleteRequest.id); else if (deleteRequest.type === 'expense') deleteExpense(deleteRequest.id); } }} actionLabel={showSettingsPrompt ? "Access Settings" : "Delete Record"} />}
+            <datalist id="expense-categories"><option value="Maintenance" /><option value="Electricity Bill" /><option value="Gas Bill" /><option value="Water Bill" /><option value="Salary" /><option value="Cleaner" /><option value="Guard" /><option value="Repairs" /><option value="Internet/Wifi" /></datalist>
+          </div>
+        );
       }
-// ...
 
-/* ------------- NEW: Password Protection Component ------------- */
-
-function PasswordPromptModal({ currentUser, isPasswordCorrect, onClose, onSuccess, actionLabel }) {
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
-    const [loading, setLoading] = useState(false);
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError("");
-        setLoading(true);
-
-        // Bypass check in TEST MODE (if Firebase not configured)
-        if (!currentUser) {
-            alert("Password protection is disabled in TEST MODE (Firebase not configured). Action authorized.");
-            onSuccess();
-            setLoading(false);
-            return;
-        }
-
-        const correct = await isPasswordCorrect(password);
-        setLoading(false);
-
-        if (correct) {
-            onSuccess();
-        } else {
-            setError("Incorrect login password. Please try again.");
-            setPassword("");
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-0 md:p-6">
-            <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-xl p-6 space-y-4">
-                <h2 className="text-xl font-bold text-indigo-700">{actionLabel} - Password Required</h2>
-                <p className="text-sm text-slate-600">
-                    Please enter your login password to proceed with: <strong>{actionLabel}</strong>.
-                </p>
-                <form onSubmit={handleSubmit} className="space-y-3">
-                    <Input 
-                        type="password" 
-                        placeholder="Login Password" 
-                        value={password} 
-                        onChange={(e) => setPassword(e.target.value)} 
-                        required 
-                        disabled={loading}
-                    />
-                    {error && <p className="text-sm text-rose-600">{error}</p>}
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={loading || !password}>
-                            {loading ? "Verifying..." : actionLabel}
-                        </Button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
-/* --------------------------- Login/Auth Components -------------------------- */
-      // Keeping these commented out but available for re-enabling
-     
-      function LoginScreen({ setAuthError }) {
-          const [email, setEmail] = useState("");
-          const [password, setPassword] = useState("");
-          const [loading, setLoading] = useState(false);
-          const [error, setError] = useState("");
-
-          const handleLogin = async (e) => {
-              e.preventDefault();
-              setError("");
-              setLoading(true);
-              try {
-                  await auth.signInWithEmailAndPassword(email, password);
-                  // Success: AuthStatusWrapper handles state change
-              } catch (err) {
-                  console.error("Login failed:", err);
-                  if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-                      setError("Invalid email or password.");
-                  } else if (err.code === 'auth/invalid-email') {
-                      setError("Invalid email format.");
-                  } else {
-                      setError("Login failed. Check console for details. (Did you enable Email/Password sign-in in Firebase Auth?)");
-                  }
-                  setAuthError(error);
-              } finally {
-                  setLoading(false);
-              }
-          };
-
+      /* ------------- Modal Components (Mobile Optimized: Bottom Sheet) ------------- */
+      function PasswordPromptModal({ currentUser, isPasswordCorrect, onClose, onSuccess, actionLabel }) {
+          const [password, setPassword] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
+          const handleSubmit = async (e) => { e.preventDefault(); if (!currentUser) { onSuccess(); return; } setLoading(true); setError(""); const correct = await isPasswordCorrect(password); setLoading(false); if (correct) onSuccess(); else { setError("Incorrect password."); setPassword(""); } };
           return (
-              <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-                  <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 space-y-4">
-                      <h1 className="text-2xl font-bold text-center text-indigo-700">Home/Shop Rent ERP</h1>
-                      <p className="text-center text-sm text-slate-500">Please sign in to continue.</p>
-                      
-                      {error && (
-                          <div className="bg-rose-100 border border-rose-400 text-rose-700 px-4 py-3 rounded relative text-sm" role="alert">
-                              <span className="block sm:inline">{error}</span>
+              <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm transition-all">
+                  <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 border dark:border-slate-700">
+                      <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2">{actionLabel}</h2>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Please verify your identity to continue.</p>
+                      <form onSubmit={handleSubmit} className="space-y-4">
+                          <Input type="password" placeholder="Enter Password" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={loading} autoFocus />
+                          {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
+                          <div className="flex justify-end gap-3 pt-2">
+                              <Button type="button" variant="ghost" onClick={onClose} className="w-full sm:w-auto">Cancel</Button>
+                              <Button type="submit" disabled={loading || !password} className="w-full sm:w-auto">{loading ? "Verifying..." : "Confirm"}</Button>
                           </div>
-                      )}
-
-                      <form onSubmit={handleLogin} className="space-y-4">
-                          <Input
-                              type="email"
-                              placeholder="Email"
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              required
-                          />
-                          <Input
-                              type="password"
-                              placeholder="Password"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              required
-                          />
-                          <Button 
-                              type="submit" 
-                              className="w-full" 
-                              disabled={loading}
-                          >
-                              {loading ? "Signing In..." : "Log In"}
-                          </Button>
-                          <p className="text-xs text-center text-slate-500">
-                             Developed By Foyaz Chowdhury
-                          </p>
                       </form>
                   </div>
               </div>
           );
       }
 
-      function AuthStatusWrapper() {
-          const [currentUser, setCurrentUser] = useState(null);
-          const [loadingAuth, setLoadingAuth] = useState(true);
-          const [authError, setAuthError] = useState(null);
-
-          useEffect(() => {
-              // Subscribe to Firebase Auth state changes
-              const unsubscribe = auth.onAuthStateChanged(user => {
-                  setCurrentUser(user);
-                  setLoadingAuth(false);
-                  setAuthError(null);
-              });
-              return () => unsubscribe();
-          }, []);
-
-          if (loadingAuth) {
-              return (
-                  <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center bg-slate-50">
-                      <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                      <div className="text-xl font-semibold text-indigo-600 mt-4">Checking Session...</div>
+      function LoginScreen({ setAuthError }) {
+          const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [loading, setLoading] = useState(false);
+          const handleLogin = async (e) => { e.preventDefault(); setLoading(true); try { await auth.signInWithEmailAndPassword(email, password); } catch { setAuthError("Invalid credentials."); } finally { setLoading(false); } };
+          return (
+              <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4 transition-colors duration-300">
+                  <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 space-y-6 border dark:border-slate-700">
+                      <div className="text-center"><div className="mx-auto h-12 w-12 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg></div><h1 className="text-2xl font-bold text-slate-900 dark:text-white">Welcome Back</h1></div>
+                      <form onSubmit={handleLogin} className="space-y-4"><Input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} required /><Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required /><Button type="submit" className="w-full py-3 text-base" disabled={loading}>{loading ? "Signing In..." : "Sign In"}</Button></form>
+                      <p className="text-xs text-center text-slate-400 mt-4">Developed by Foyaz Chowdhury</p>
                   </div>
-              );
-          }
-
-          if (!currentUser) {
-              return <LoginScreen setAuthError={setAuthError} />;
-          }
-
-          return <App currentUser={currentUser} />;
+              </div>
+          );
       }
+
+      function AuthStatusWrapper() { const [currentUser, setCurrentUser] = useState(null); const [loading, setLoading] = useState(true); useEffect(() => { const unsub = auth.onAuthStateChanged(u => { setCurrentUser(u); setLoading(false); }); return unsub; }, []); if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>; if (!currentUser) return <LoginScreen setAuthError={(e) => alert(e)} />; return <App currentUser={currentUser} />; }
      
-      /* ------------- Dashboard (MODIFIED - Removed Monthly Summary) ------------- */
+      /* ------------- Dashboard ------------- */
       function DashboardSection({ totals, units, outstandingByUnit, unitsForReminder, setTab }) { 
         const totalDue = Object.values(outstandingByUnit).reduce((s, v) => s + Math.max(0, v), 0);
+        const occupiedCount = units.filter(u => u.tenant).length;
+        const totalCount = units.length;
+        const occupancyRate = totalCount > 0 ? Math.round((occupiedCount / totalCount) * 100) : 0;
         return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-              <StatCard label="Total Income" value={currency(totals.income)} />
-              <StatCard label="Total Expenses" value={currency(totals.expense)} />
-              <StatCard label="Net Profit" value={currency(totals.net)} />
-              <StatCard label="Current Month Due" value={currency(totalDue)} />
-
-              {/* NEW: Reminder card */}
-              {unitsForReminder.length > 0 && (
-                <div className="col-span-2 md:col-span-4">
-                  <Section title="⚠️ Rent Reminder Needed Today">
-                    <div className="space-y-2">
-                      {unitsForReminder.map(u => (
-                        <div key={u.id} className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 p-3">
-                          <div className="font-medium">{u.name} (Due: {u.dueDay}th)</div>
-                          <a href={u.whatsappLink} target="_blank" rel="noopener noreferrer">
-                            <Button variant="primary" className="text-sm"> Send WhatsApp to {u.tenant} </Button>
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-2">These units are 2 days from their due date, have reminders enabled, and have not been fully paid this month.</div>
-                  </Section>
-                </div>
-              )}
-              {/* End of NEW: Reminder card */}
-
-              <div className="col-span-2 md:col-span-4">
-                <Section title="Quick Actions" right={<div />}>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <Button className="w-full" onClick={() => setTab("newReceipt")}>New Receipt</Button>
-                    <Button variant="secondary" className="w-full" onClick={() => setTab("statement")}>View Statement</Button>
-                    <Button variant="secondary" className="w-full" onClick={() => setTab("units")}>Manage Units</Button>
-                    <Button variant="secondary" className="w-full" onClick={() => setTab("expenses")}>Add Expense</Button>
-                  </div>
-                </Section>
-              </div>
-
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard label="Income" value={currency(totals.income)} color="text-emerald-600 dark:text-emerald-400" icon="💰" />
+              <StatCard label="Expenses" value={currency(totals.expense)} color="text-rose-600 dark:text-rose-400" icon="📉" />
+              <StatCard label="Net Profit" value={currency(totals.net)} color="text-indigo-600 dark:text-indigo-400" icon="📊" />
+              <StatCard label="Due Rent" value={currency(totalDue)} color="text-orange-500 dark:text-orange-400" icon="⚠️" />
             </div>
-
-            <Section title="Current Month Dues">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {units.map((u) => (
-                  <div key={u.id} className="flex items-center justify-between rounded-xl border p-3">
-                    <div>
-                      <div className="font-medium">{u.name}</div>
-                      <div className="text-xs text-slate-500">{u.tenant || "Vacant"}</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl p-6 text-white shadow-lg flex flex-col justify-between">
+                    <div><h3 className="text-indigo-100 font-medium mb-1">Occupancy Rate</h3><div className="text-4xl font-bold">{occupancyRate}%</div><div className="text-sm text-indigo-200 mt-2">{occupiedCount} of {totalCount} Units Occupied</div></div>
+                    <div className="mt-4 bg-white/20 h-2 rounded-full overflow-hidden"><div className="bg-white h-full" style={{ width: `${occupancyRate}%` }}></div></div>
+                </div>
+                <div className="md:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                    <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><span>🔔</span> Pending Reminders {unitsForReminder.length > 0 && <span className="bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-200 text-xs px-2 py-0.5 rounded-full">{unitsForReminder.length}</span>}</h3>
+                    <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
+                        {unitsForReminder.length === 0 ? ( <p className="text-slate-500 dark:text-slate-400 text-sm italic">No reminders due today.</p> ) : ( unitsForReminder.map(u => ( <div key={u.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-100 dark:border-slate-600"> <div> <div className="font-medium text-sm text-slate-800 dark:text-slate-200">{u.name} <span className="text-slate-400">|</span> {u.tenant}</div> <div className="text-xs text-slate-500 dark:text-slate-400">Due: {u.dueDay}th</div> </div> <a href={u.whatsappLink} target="_blank" className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 p-2 rounded-full transition"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg></a> </div> )) )}
                     </div>
-                    <div className={outstandingByUnit[u.id] > 0 ? "text-rose-600 font-semibold" : "text-emerald-600 font-semibold"}>
-                      {currency(outstandingByUnit[u.id])}
-                    </div>
-                  </div>
-                ))}
+                </div>
+            </div>
+            <Section title="Unit Status & Dues">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {units.map((u) => ( <div key={u.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-600 bg-white dark:bg-slate-700/50 hover:border-indigo-200 transition group"> <div> <div className="font-medium flex items-center gap-2 text-slate-700 dark:text-slate-200"> {u.name} {!u.tenant && <span className="text-[10px] bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-slate-500">Vacant</span>} </div> <div className="text-xs text-slate-400 mt-0.5">{u.tenant || "—"}</div> </div> <div className={classNames("font-bold text-sm", outstandingByUnit[u.id] > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}> {currency(outstandingByUnit[u.id])} </div> </div> ))}
               </div>
             </Section>
           </div>
         );
       }
       
-      /* ------------- Date Range Statement Component (MODIFIED - Date Logic Fixed) ------------- */
+      /* ------------- Tables & Lists ------------- */
       function DateRangeStatement({ payments, expenses }) {
-        // Helper to get the first day of the current month (YYYY-MM-DD)
         const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10);
-        
-        // Default range: current month
-        const [startDate, setStartDate] = useState(getFirstDayOfMonth(new Date()));
-        const [endDate, setEndDate] = useState(todayStr());
-
+        const [startDate, setStartDate] = useState(getFirstDayOfMonth(new Date())); const [endDate, setEndDate] = useState(todayStr());
         const filteredData = useMemo(() => {
-            // Helper function to create a date object normalized to local midnight
-            // This is crucial for accurate date-range filtering, avoiding UTC/timezone issues
-            const getLocalDateTimestamp = (dateStr) => {
-                if (!dateStr) return 0;
-                // dateStr is 'YYYY-MM-DD'
-                const parts = dateStr.split('-');
-                // Date(year, month-1, day) creates a date at midnight in the local timezone
-                return new Date(parts[0], parts[1] - 1, parts[2]).getTime();
-            };
-
-            // 1. Calculate the start boundary (local midnight of start date)
-            const start = getLocalDateTimestamp(startDate);
-            
-            // 2. Calculate the end boundary (local midnight of the day *after* the end date)
-            // Get the local midnight of the end date
-            const endDayMidnight = getLocalDateTimestamp(endDate);
-            // Add one full day (24 * 60 * 60 * 1000 ms = 86400000) to get the start of the next day
-            const end = endDayMidnight + 86400000; 
-
-            // Filter transactions: must be >= start of start date AND < start of day after end date
-            const incomeList = payments.filter(p => {
-                if (!p.date) return false;
-                const date = getLocalDateTimestamp(p.date); // Normalize transaction date to local midnight
-                return date >= start && date < end;
-            });
-
-            const expenseList = expenses.filter(e => {
-                if (!e.date) return false;
-                const date = getLocalDateTimestamp(e.date); // Normalize transaction date to local midnight
-                return date >= start && date < end;
-            });
-
-            const totalIncome = incomeList.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-            const totalExpense = expenseList.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-            const netProfit = totalIncome - totalExpense;
-
-            const combinedList = [
-                ...incomeList.map(p => ({
-                    id: `P-${p.id}`,
-                    date: p.date,
-                    description: `${p.purpose || "Rent"} received for ${p.unitId} (${p.tenant}) - Month: ${formatMonth(p.forMonth)}`,
-                    type: 'Income',
-                    amount: Number(p.amount || 0),
-                })),
-                ...expenseList.map(e => ({
-                    id: `E-${e.id}`,
-                    date: e.date,
-                    description: `Expense: ${e.category} (${e.notes || e.vendor || 'N/A'})`,
-                    type: 'Expense',
-                    amount: Number(e.amount || 0),
-                })),
-            ].sort((a, b) => new Date(a.date) - new Date(b.date)); // Sort by date ascending
-
-            return { combinedList, totalIncome, totalExpense, netProfit };
+            const getLocalDateTimestamp = (dateStr) => { if (!dateStr) return 0; const parts = dateStr.split('-'); return new Date(parts[0], parts[1] - 1, parts[2]).getTime(); };
+            const start = getLocalDateTimestamp(startDate); const end = getLocalDateTimestamp(endDate) + 86400000;
+            const incomeList = payments.filter(p => { const d = getLocalDateTimestamp(p.date); return d >= start && d < end; });
+            const expenseList = expenses.filter(e => { const d = getLocalDateTimestamp(e.date); return d >= start && d < end; });
+            let runningBalance = 0;
+            const combinedList = [ ...incomeList.map(p => ({ id: `P-${p.id}`, rawDate: p.date, description: `${p.purpose || "Rent"} - ${p.unitId} (${p.tenant})`, type: 'Income', amount: Number(p.amount || 0) })), ...expenseList.map(e => ({ id: `E-${e.id}`, rawDate: e.date, description: `${e.category} (${e.vendor || '-'})`, type: 'Expense', amount: -Number(e.amount || 0) })), ].sort((a, b) => new Date(a.rawDate) - new Date(b.rawDate)).map(item => { runningBalance += item.amount; return { ...item, balance: runningBalance, displayAmount: Math.abs(item.amount) }; });
+            return { combinedList, totalIncome: incomeList.reduce((sum, p) => sum + Number(p.amount || 0), 0), totalExpense: expenseList.reduce((sum, e) => sum + Number(e.amount || 0), 0), netProfit: incomeList.reduce((sum, p) => sum + Number(p.amount || 0), 0) - expenseList.reduce((sum, e) => sum + Number(e.amount || 0), 0) };
         }, [payments, expenses, startDate, endDate]);
 
         return (
-            <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <label className="text-sm font-medium block mb-1">Start Date</label>
-                        <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ width: "auto", height: "auto", padding: "auto", fontSize: "16px", }} />
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium block mb-1">End Date</label>
-                        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ width: "auto", height: "auto", padding: "auto", fontSize: "16px", }} />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 md:gap-4 border-t pt-4">
-                    <StatCard label="Total Income" value={currency(filteredData.totalIncome)} />
-                    <StatCard label="Total Expense" value={currency(filteredData.totalExpense)} />
-                    <StatCard label="Net Profit" value={currency(filteredData.netProfit)} />
-                </div>
-
-                <div className="overflow-auto rounded-2xl border">
-                    <table className="min-w-full text-sm">
-                        <thead className="bg-slate-100 text-slate-600">
-                            <tr>
-                                <th className="p-3 text-left">Date</th>
-                                <th className="p-3 text-left">Description</th>
-                                <th className="p-3 text-left">Type</th>
-                                <th className="p-3 text-right">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredData.combinedList.length === 0 ? (
-                                <tr><td colSpan="4" className="p-3 text-center text-slate-500">No transactions in this date range.</td></tr>
-                            ) : (
-                                filteredData.combinedList.map((item) => (
-                                    <tr key={item.id} className="border-t hover:bg-slate-50">
-                                        <td className="p-3 whitespace-nowrap">{item.date}</td>
-                                        <td className="p-3 max-w-xs">{item.description}</td>
-                                        <td className="p-3">
-                                            <span className={item.type === 'Income' ? 'text-emerald-600' : 'text-rose-600'}>
-                                                {item.type}
-                                            </span>
-                                        </td>
-                                        <td className="p-3 text-right font-semibold">
-                                            {currency(item.amount)}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+            <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row gap-4 bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600"><div className="flex-1"><label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 block">From</label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div><div className="flex-1"><label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 block">To</label><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div></div>
+                <div className="grid grid-cols-3 gap-2 md:gap-4"><div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 text-center"><div className="text-xs text-emerald-600 dark:text-emerald-400 uppercase font-bold">Income</div><div className="text-lg md:text-xl font-bold text-emerald-700 dark:text-emerald-300">{currency(filteredData.totalIncome)}</div></div><div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-xl border border-rose-100 dark:border-rose-800 text-center"><div className="text-xs text-rose-600 dark:text-rose-400 uppercase font-bold">Expense</div><div className="text-lg md:text-xl font-bold text-rose-700 dark:text-rose-300">{currency(filteredData.totalExpense)}</div></div><div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 text-center"><div className="text-xs text-indigo-600 dark:text-indigo-400 uppercase font-bold">Net</div><div className="text-lg md:text-xl font-bold text-indigo-700 dark:text-indigo-300">{currency(filteredData.netProfit)}</div></div></div>
+                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="min-w-full text-xs md:text-sm"><thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700"><tr><th className="p-3 text-left">Date</th><th className="p-3 text-left">Description</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Balance</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{filteredData.combinedList.length === 0 ? ( <tr><td colSpan="4" className="p-8 text-center text-slate-400">No transactions in this period.</td></tr> ) : ( filteredData.combinedList.map((item) => ( <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition"> <td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{formatDisplayDate(item.rawDate)}</td> <td className="p-3 max-w-[150px] truncate text-slate-700 dark:text-slate-200">{item.description}</td> <td className={`p-3 text-right font-medium ${item.type === 'Income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}> {item.type === 'Expense' ? '-' : '+'}{currency(item.displayAmount)} </td> <td className="p-3 text-right text-slate-500 dark:text-slate-400 font-mono">{currency(item.balance)}</td> </tr> )) )}</tbody></table></div></div>
             </div>
         );
       }
 
+      function StatCard({ label, value, color, icon }) { return ( <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between"> <div> <div className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wide">{label}</div> <div className={`text-xl md:text-2xl font-bold ${color} mt-1`}>{value}</div> </div> <div className="text-2xl opacity-80">{icon}</div> </div> ); }
 
-      /* ------------- StatCard (unchanged) ------------- */
-      function StatCard({ label, value }) {
-        return (
-          <div className="bg-white rounded-2xl shadow p-4 space-y-1">
-            <div className="text-sm text-slate-500">{label}</div>
-            <div className="text-2xl font-bold">{value}</div>
-          </div>
-        );
-      }
-      /* ------------- Unit Management (unchanged) ------------- */
       function UnitsTable({ units, upsertUnit, deleteUnit }) {
-        const [unitForm, setUnitForm] = useState({});
-        const [showProfileId, setShowProfileId] = useState(null); 
-        const profileUnit = units.find(u => u.id === showProfileId);
-
-        const edit = (unit) => setUnitForm(unit);
-        const reset = () => setUnitForm({});
-        const submit = () => {
-          if (!unitForm.id || !unitForm.name) return alert("Please fill ID and Name");
-          upsertUnit({ ...unitForm, rent: Number(unitForm.rent || 0), dueDay: Number(unitForm.dueDay || 1) });
-          reset();
-        };
-
+        const [unitForm, setUnitForm] = useState({}); const [showProfileId, setShowProfileId] = useState(null); const profileUnit = units.find(u => u.id === showProfileId);
+        const reset = () => setUnitForm({}); const submit = () => { if (!unitForm.id || !unitForm.name) return alert("Fill ID and Name"); upsertUnit({ ...unitForm, rent: Number(unitForm.rent || 0), dueDay: Number(unitForm.dueDay || 1) }); reset(); };
         return (
-          <div className="grid md:grid-cols-3 gap-3 md:gap-4">
-            <div className="md:col-span-1 bg-slate-50 border rounded-2xl p-3 space-y-2">
-              <div className="font-semibold">Add / Edit Unit</div>
-              <div className="grid gap-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder="Unit ID (e.g., F1)" value={unitForm.id || ""} onChange={(e) => setUnitForm({ ...unitForm, id: e.target.value })} />
-                  <Select value={unitForm.type} onChange={(e) => setUnitForm({ ...unitForm, type: e.target.value })}>
-                    <option>Flat</option>
-                    <option>Shop</option>
-                  </Select>
-                </div>
-                <Input placeholder="Name" value={unitForm.name || ""} onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })} />
-                <Input type="number" placeholder="Floor" value={unitForm.floor ?? ""} onChange={(e) => setUnitForm({ ...unitForm, floor: Number(e.target.value) })} />
-                <Input type="number" placeholder="Monthly Rent" value={unitForm.rent ?? ""} onChange={(e) => setUnitForm({ ...unitForm, rent: e.target.value })} />
-                <Input type="number" placeholder="Due Day (1-28)" value={unitForm.dueDay ?? ""} onChange={(e) => setUnitForm({ ...unitForm, dueDay: e.target.value })} />
+          <div className="grid lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700 rounded-xl p-5 space-y-4 h-fit">
+              <h3 className="font-bold text-slate-800 dark:text-slate-200">Add / Edit Unit</h3>
+              <div className="space-y-3">
+                <div className="flex gap-2"><div className="w-1/3"><Input placeholder="ID (A1)" value={unitForm.id || ""} onChange={(e) => setUnitForm({ ...unitForm, id: e.target.value })} /></div><div className="w-2/3"><Select value={unitForm.type} onChange={(e) => setUnitForm({ ...unitForm, type: e.target.value })}><option>Flat</option><option>Shop</option></Select></div></div>
+                <Input placeholder="Unit Name" value={unitForm.name || ""} onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })} />
+                <div className="flex gap-2"><Input type="number" placeholder="Rent Amount" value={unitForm.rent ?? ""} onChange={(e) => setUnitForm({ ...unitForm, rent: e.target.value })} /><Input type="number" placeholder="Due Day" value={unitForm.dueDay ?? ""} onChange={(e) => setUnitForm({ ...unitForm, dueDay: e.target.value })} /></div>
+                <hr className="border-slate-200 dark:border-slate-600" />
                 <Input placeholder="Tenant Name" value={unitForm.tenant || ""} onChange={(e) => setUnitForm({ ...unitForm, tenant: e.target.value })} />
-                <Input placeholder="Tenant Phone (for WhatsApp)" value={unitForm.tenantPhone || ""} onChange={(e) => setUnitForm({ ...unitForm, tenantPhone: e.target.value })} />
-                {/* NEW: Reminder Toggle */}
-                <Checkbox id="enableReminder" label="Enable 2-day Rent Reminder (WhatsApp)" checked={unitForm.enableReminder} onChange={(e) => setUnitForm({ ...unitForm, enableReminder: e.target.checked })} />
-                
-                <hr className="my-2 border-slate-200" />
-                {/* MODIFIED: File Uploads */}
-                <div className="font-medium text-sm mb-2">Tenant Documents (Upload)</div>
-                <FileUpload label="Tenant Photo" urlKey="tenantPhoto" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.tenantPhotoUrl} />
-                <FileUpload label="NID Scan/Photo" urlKey="tenantNid" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.tenantNidUrl} />
-                <FileUpload label="Rent Agreement" urlKey="rentAgreement" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.rentAgreementUrl} />
-                <hr className="my-2 border-slate-200" />
-
+                <Input placeholder="Phone (WhatsApp)" value={unitForm.tenantPhone || ""} onChange={(e) => setUnitForm({ ...unitForm, tenantPhone: e.target.value })} />
+                <Checkbox id="enableReminder" label="Enable WhatsApp Reminder" checked={unitForm.enableReminder} onChange={(e) => setUnitForm({ ...unitForm, enableReminder: e.target.checked })} />
+                <hr className="border-slate-200 dark:border-slate-600" />
+                <FileUpload label="Photo" urlKey="tenantPhoto" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.tenantPhotoUrl} /><FileUpload label="NID" urlKey="tenantNid" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.tenantNidUrl} /><FileUpload label="Agreement" urlKey="rentAgreement" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.rentAgreementUrl} />
               </div>
-              <div className="flex gap-2">
-                <Button onClick={submit}>{unitForm.id ? "Save Changes" : "Add Unit"}</Button>
-                <Button variant="secondary" onClick={reset}>Reset Form</Button>
-                {unitForm.id && <Button variant="danger" onClick={() => deleteUnit(unitForm.id)}>Delete Unit</Button>}
-              </div>
+              <div className="flex gap-2 pt-2"><Button onClick={submit} className="flex-1">{unitForm.id ? "Save" : "Add"}</Button><Button variant="secondary" onClick={reset}>Clear</Button>{unitForm.id && <Button variant="danger" onClick={() => deleteUnit(unitForm.id)}>Delete</Button>}</div>
             </div>
-
-            <div className="md:col-span-2 overflow-auto rounded-2xl border">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-100 text-slate-600">
-                  <tr>
-                    <th className="p-3 text-left">ID/Name</th>
-                    <th className="p-3 text-left">Tenant</th>
-                    <th className="p-3 text-right">Rent</th>
-                    <th className="p-3 text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {units.map((u) => (
-                    <tr key={u.id} className="border-t hover:bg-slate-50">
-                      <td className="p-3 font-medium">
-                        {u.id} - {u.name}
-                      </td>
-                      <td className="p-3">{u.tenant || "—"}</td>
-                      <td className="p-3 text-right">{currency(u.rent)}</td>
-                      <td className="p-3 flex gap-2">
-                        <Button variant="secondary" className="text-xs" onClick={() => edit(u)}>
-                          Edit
-                        </Button>
-                        <Button variant="secondary" className="text-xs" onClick={() => setShowProfileId(u.id)}>
-                          Profile
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="lg:col-span-2 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 text-left"><tr><th className="p-3">Unit</th><th className="p-3">Tenant</th><th className="p-3 text-right">Rent</th><th className="p-3 text-center">Action</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{units.map((u) => ( <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50"><td className="p-3"><div className="font-medium text-slate-800 dark:text-slate-200">{u.name}</div><div className="text-xs text-slate-400">{u.id} • {u.type}</div></td><td className="p-3"> {u.tenant ? ( <div className="text-slate-700 dark:text-slate-300">{u.tenant}</div> ) : ( <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">Vacant</span> )}</td><td className="p-3 text-right font-mono text-slate-600 dark:text-slate-300">{currency(u.rent)}</td><td className="p-3 flex justify-center gap-2"><button className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1.5 rounded" onClick={() => setUnitForm(u)}>✎</button><button className="text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 p-1.5 rounded" onClick={() => setShowProfileId(u.id)}>👁️</button></td></tr> ))}</tbody></table></div>
             </div>
-            {/* NEW: Tenant Profile Modal */}
             {profileUnit && (
-              <TenantProfileModal unit={profileUnit} onClose={() => setShowProfileId(null)} />
-            )}
-            {/* End NEW: Tenant Profile Modal */}
-          </div>
-        );
-      }
-      /* ------------- Tenant Profile Modal (NEW) (unchanged) ------------- */
-      function DocumentLink({ label, url }) {
-        return (
-          <p className="text-sm">
-            <span className="font-medium text-slate-500">{label}:</span> 
-            {url ? (
-                <a href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline ml-1">View Document</a>
-            ) : (
-                <span className="ml-1 text-rose-500">Not Uploaded</span>
-            )}
-          </p>
-        );
-      }
-      function TenantProfileModal({ unit, onClose }) {
-        return (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-0 md:p-6">
-            <div className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl shadow-xl">
-              <div className="p-3 border-b flex items-center justify-between">
-                <div className="font-semibold text-lg">Tenant Profile: {unit.tenant} ({unit.name})</div>
-                <Button variant="danger" onClick={onClose}>Close</Button>
-              </div>
-              <div className="p-4 overflow-y-auto max-h-[80vh]">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-semibold border-b pb-2">Tenant Details</h3>
-                    <p className="text-sm"><span className="font-medium text-slate-500">Name:</span> {unit.tenant || 'N/A'}</p>
-                    <p className="text-sm"><span className="font-medium text-slate-500">Phone:</span> {unit.tenantPhone || 'N/A'}</p>
-                    <p className="text-sm"><span className="font-medium text-slate-500">Unit:</span> {unit.name}</p>
-                    <p className="text-sm"><span className="font-medium text-slate-500">Rent:</span> {currency(unit.rent)}</p>
-                    <p className="text-sm"><span className="font-medium text-slate-500">Due Day:</span> {unit.dueDay}th</p>
-                    <p className="text-sm"> 
-                        <span className="font-medium text-slate-500">Reminder:</span> 
-                        <span className={unit.enableReminder ? 'text-emerald-600' : 'text-rose-600'}> 
-                            {unit.enableReminder ? 'Enabled' : 'Disabled'} 
-                        </span> 
-                    </p>
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-semibold border-b pb-2">Documents</h3>
-                    <DocumentLink label="Tenant Photo" url={unit.tenantPhotoUrl} />
-                    <DocumentLink label="NID Scan/Photo" url={unit.tenantNidUrl} />
-                    <DocumentLink label="Rent Agreement" url={unit.rentAgreementUrl} />
-                    <p className="text-xs text-slate-500 pt-2">Note: Click "View Document" to open the uploaded file.</p>
-                  </div>
-                </div>
-                <div className="pt-4 mt-4 border-t">
-                  {/* Display photo if URL exists */}
-                  {unit.tenantPhotoUrl && (
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-semibold">Tenant Photo Preview</h3>
-                      <img src={unit.tenantPhotoUrl} alt="Tenant Photo" className="max-w-full h-auto rounded-xl shadow-lg" />
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-800 w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 border dark:border-slate-700">
+                        <div className="bg-slate-50 dark:bg-slate-700/50 p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center"><h3 className="font-bold text-lg text-slate-800 dark:text-white">Tenant Profile</h3><button onClick={() => setShowProfileId(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button></div>
+                        <div className="p-6 space-y-4">
+                            <div className="flex items-center gap-4"><div className="h-16 w-16 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center text-2xl overflow-hidden text-slate-500 dark:text-slate-400">{profileUnit.tenantPhotoUrl ? <img src={profileUnit.tenantPhotoUrl} className="h-full w-full object-cover" /> : "👤"}</div><div><div className="text-xl font-bold text-slate-800 dark:text-white">{profileUnit.tenant || "No Tenant"}</div><div className="text-slate-500 dark:text-slate-400">{profileUnit.name}</div></div></div>
+                            <div className="grid grid-cols-2 gap-4 py-2"><div className="bg-slate-50 dark:bg-slate-700/30 p-3 rounded-lg border border-slate-100 dark:border-slate-700"><div className="text-xs text-slate-500 dark:text-slate-400 uppercase">Phone</div><div className="font-medium text-slate-700 dark:text-slate-200">{profileUnit.tenantPhone || "N/A"}</div></div><div className="bg-slate-50 dark:bg-slate-700/30 p-3 rounded-lg border border-slate-100 dark:border-slate-700"><div className="text-xs text-slate-500 dark:text-slate-400 uppercase">Rent</div><div className="font-medium text-slate-700 dark:text-slate-200">{currency(profileUnit.rent)}</div></div></div>
+                            <div className="space-y-2"><div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Documents</div><div className="flex gap-2">{profileUnit.tenantNidUrl ? <a href={profileUnit.tenantNidUrl} target="_blank" className="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded border border-indigo-100 dark:border-indigo-800">View NID</a> : <span className="text-xs text-slate-400 italic">No NID</span>}{profileUnit.rentAgreementUrl ? <a href={profileUnit.rentAgreementUrl} target="_blank" className="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded border border-indigo-100 dark:border-indigo-800">View Agreement</a> : <span className="text-xs text-slate-400 italic">No Agreement</span>}</div></div>
+                        </div>
                     </div>
-                  )}
                 </div>
-              </div>
-            </div>
+            )}
           </div>
         );
       }
-      /* ------------- Payments Table (MODIFIED to unmerge Print and Delete buttons) ------------- */
-function PaymentsTable({ payments, units, onRowClick, onDelete }) {
-  const [search, setSearch] = useState("");
-  const filtered = useMemo(() => {
-    if (!search) return payments;
-    const q = search.toLowerCase();
-    return payments.filter(
-      (p) =>
-        (p.receiptNo || "").toLowerCase().includes(q) ||
-        (p.unitId || "").toLowerCase().includes(q) ||
-        (p.tenant || "").toLowerCase().includes(q) ||
-        (units.find((u) => u.id === p.unitId)?.name || "").toLowerCase().includes(q)
-    ).sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort descending by date
-  }, [payments, search, units]);
 
-  return (
-    <div className="space-y-4">
-      <Input placeholder="Search payments..." value={search} onChange={(e) => setSearch(e.target.value)} />
-      <div className="overflow-auto rounded-2xl border">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-100 text-slate-600">
-            <tr>
-              <th className="p-3 text-left">Date</th>
-              <th className="p-3 text-left">Receipt No.</th>
-              <th className="p-3 text-left">Unit</th>
-              <th className="p-3 text-left">Tenant</th>
-              <th className="p-3 text-right">Amount</th>
-              <th className="p-3 text-left">Method</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p) => (
-              <tr key={p.id} className="border-t hover:bg-slate-50">
-                <td className="p-3 whitespace-nowrap">{p.date}</td>
-                <td className="p-3 whitespace-nowrap">{p.receiptNo}</td>
-                <td className="p-3 whitespace-nowrap">{units.find((u) => u.id === p.unitId)?.name || p.unitId}</td>
-                <td className="p-3 whitespace-nowrap">{p.tenant}</td>
-                <td className="p-3 text-right whitespace-nowrap">{currency(p.amount)}</td>
-                {/* MODIFIED: Removed the cursor-pointer class and onClick to unmerge Print action [cite: 1304] */}
-                <td className="p-3">{p.method}</td>
-                <td className="p-3">
-                  {/* MODIFIED: Added a flex container and a dedicated Print button [cite: 1304] */}
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="secondary" 
-                      className="text-xs py-1 px-2" 
-                      onClick={() => onRowClick(p)} // This now triggers the print/view receipt modal
-                    > 
-                      Print 
-                    </Button>
-                    <Button 
-                      variant="danger" 
-                      className="text-xs py-1 px-2" 
-                      onClick={() => onDelete(p.id)}
-                    > 
-                      Delete 
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-      /* ------------- New Receipt (unchanged from last modified version) ------------- */
-      function NewReceiptForm({ units, addPayment, data }) {
-        const [form, setForm] = useState({ date: todayStr(), method: "Cash", purpose: "Rent" }); // ADDED purpose
-
-        useEffect(() => { 
-            if (!form.receiptNo) setForm((f) => ({ ...f, receiptNo: nextReceiptNo(data.payments) })); 
-        }, [data.payments, form.receiptNo]);
-
-        const resetForm = () => setForm({ date: todayStr(), method: "Cash", purpose: "Rent", receiptNo: nextReceiptNo(data.payments) }); // ADDED purpose
-
-        // MODIFIED SUBMIT FUNCTION FOR CLEARER VALIDATION (Issue #1 fix)
-        const submit = () => {
-          if (!form.unitId) return alert("Please select a Unit.");
-          if (!form.tenant) return alert("Please enter Tenant Name.");
-          if (!form.amount) return alert("Please enter Amount.");
-          if (!form.forMonth) return alert("Please select For Month.");
-          // purpose is not required if it defaults to Rent
-
-          addPayment({ ...form, amount: Number(form.amount || 0), purpose: form.purpose || "Rent" }); // Use "Rent" as fallback
-          alert(`Receipt ${form.receiptNo} created ✅`);
-          setForm({ date: todayStr(), method: form.method, purpose: form.purpose || "Rent", receiptNo: nextReceiptNo([...data.payments, form]) });
-        };
-        
-        const unit = units.find((u) => u.id === form.unitId);
-
+      function PaymentsTable({ payments, units, onRowClick, onDelete }) {
+        const [search, setSearch] = useState("");
+        const filtered = useMemo(() => { if (!search) return payments; const q = search.toLowerCase(); return payments.filter(p => (p.receiptNo || "").toLowerCase().includes(q) || (p.tenant || "").toLowerCase().includes(q)).sort((a, b) => new Date(b.date) - new Date(a.date)); }, [payments, search]);
         return (
-          <div className="grid md:grid-cols-3 gap-3 md:gap-4">
-            <div className="md:col-span-2 bg-slate-50 border rounded-2xl p-3 space-y-2">
-              <div className="font-semibold">Receipt Details</div>
-              <div className="grid grid-cols-2 gap-2">
-                <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={{ width: "auto", height: "auto", padding: "auto", fontSize: "16px", }} />
-                
-                {/* NEW: Purpose Select (Feature #2) */}
-                <Select
-                    value={form.purpose || "Rent"}
-                    onChange={(e) => setForm({ ...form, purpose: e.target.value })}
-                  >
-                    <option>Rent</option>
-                    <option>Advance Rent</option>
-                    <option>Security Money</option>
-                    <option>Others</option>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <Select
-                  value={form.unitId || ""}
-                  onChange={(e) => {
-                    const newUnitId = e.target.value;
-                    const selectedUnit = units.find((u) => u.id === newUnitId);
-                    setForm((f) => ({
-                      ...f,
-                      unitId: newUnitId,
-                      tenant: selectedUnit ? selectedUnit.tenant : "",
-                      amount: selectedUnit ? selectedUnit.rent : "",
-                    }));
-                  }}
-                >
-                  <option value="" disabled>
-                    Select Unit (ID - Name)
-                  </option>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.id} - {u.name}
-                    </option>
-                  ))}
-                </Select>
-                <Input
-                  type="month"
-                  value={form.forMonth || ""} style={{ width: "auto", height: "auto", padding: "auto", fontSize: "16px", }}
-                  onChange={(e) => setForm({ ...form, forMonth: e.target.value })}
-                />
-              </div>
-
-              <Input placeholder="Tenant Name" value={form.tenant || ""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} />
-              <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-
-              <Select value={form.method || ""} onChange={(e) => setForm({ ...form, method: e.target.value })}>
-                <option>Cash</option>
-                <option>Bank Transfer</option>
-                <option>Mobile Banking (Bkash/Nagad)</option>
-                <option>Cheque</option>
-              </Select>
-
-              <Input placeholder="Notes (Optional)" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-
-              <div className="flex gap-2">
-                <Button onClick={submit}>Create Receipt (No. {form.receiptNo})</Button>
-                <Button variant="secondary" onClick={resetForm}>Reset Form</Button>
-              </div>
+            <div className="space-y-4">
+            <Input placeholder="Search receipt number or tenant..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 text-left"><tr><th className="p-3">Date</th><th className="p-3">Receipt</th><th className="p-3">Tenant</th><th className="p-3 text-right">Amount</th><th className="p-3 text-center">Action</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{filtered.map((p) => ( <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50"><td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{formatDisplayDate(p.date)}</td><td className="p-3 font-mono text-xs text-slate-500 dark:text-slate-400">{p.receiptNo}</td><td className="p-3"><div className="font-medium text-slate-800 dark:text-slate-200">{p.tenant}</div><div className="text-xs text-slate-400">{units.find(u => u.id === p.unitId)?.name || p.unitId}</div></td><td className="p-3 text-right font-medium text-slate-700 dark:text-slate-200">{currency(p.amount)}</td><td className="p-3 flex justify-center gap-2"><button className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 px-2 py-1 rounded text-xs" onClick={() => onRowClick(p)}>Print</button><button className="bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 px-2 py-1 rounded text-xs" onClick={() => onDelete(p.id)}>Del</button></td></tr> ))}</tbody></table></div></div>
             </div>
-            <div className="md:col-span-1 bg-white border rounded-2xl p-4 space-y-3">
-              <div className="font-semibold border-b pb-2">Unit Details</div>
-              {unit ?
-              ( <div className="text-sm space-y-1"> 
-                  <div><span className="text-slate-500">Name:</span> {unit.name}</div>
-                  <div><span className="text-slate-500">Type:</span> {unit.type}</div>
-                  <div><span className="text-slate-500">Rent:</span> {currency(unit.rent)}</div>
-                  <div><span className="text-slate-500">Tenant:</span> {unit.tenant || "—"}</div>
-                </div> 
-              ) : ( 
-                <div className="text-sm text-slate-500">Select a unit to preview details.</div> 
-              )}
+        );
+      }
+
+      function NewReceiptForm({ units, addPayment, data }) {
+        const [form, setForm] = useState({ date: todayStr(), method: "Cash", purpose: "Rent" });
+        useEffect(() => { if (!form.receiptNo) setForm((f) => ({ ...f, receiptNo: nextReceiptNo(data.payments) })); }, [data.payments, form.receiptNo]);
+        const resetForm = () => setForm({ date: todayStr(), method: "Cash", purpose: "Rent", receiptNo: nextReceiptNo(data.payments) });
+        const submit = () => { if (!form.unitId || !form.tenant || !form.amount || !form.forMonth) return alert("Please complete all fields."); addPayment({ ...form, amount: Number(form.amount || 0), purpose: form.purpose || "Rent" }); alert(`Receipt ${form.receiptNo} created ✅`); setForm({ date: todayStr(), method: form.method, purpose: form.purpose || "Rent", receiptNo: nextReceiptNo([...data.payments, form]) }); };
+        const unit = units.find((u) => u.id === form.unitId);
+        return (
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="md:col-span-2 space-y-4">
+               <div className="flex flex-col sm:flex-row gap-3"><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Date</label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Purpose</label><Select value={form.purpose || "Rent"} onChange={(e) => setForm({ ...form, purpose: e.target.value })}><option>Rent</option><option>Advance</option><option>Utility</option><option>Service</option><option>Other</option></Select></div></div>
+               <div className="flex flex-col sm:flex-row gap-3"><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Unit</label><Select value={form.unitId || ""} onChange={(e) => { const u = units.find(x => x.id === e.target.value); setForm(f => ({ ...f, unitId: e.target.value, tenant: u?.tenant || "", amount: u?.rent || "" })); }}><option value="" disabled>Select Unit</option>{units.map((u) => <option key={u.id} value={u.id}>{u.name} {u.tenant ? `(${u.tenant})` : '- Vacant'}</option>)}</Select></div><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">For Month</label><Input type="month" value={form.forMonth || ""} onChange={(e) => setForm({ ...form, forMonth: e.target.value })} /></div></div>
+              <div><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Tenant Name</label><Input placeholder="Enter Name" value={form.tenant || ""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} /></div>
+              <div className="flex flex-col sm:flex-row gap-3"><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Amount (৳)</label><Input type="number" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="font-bold text-indigo-700 dark:text-indigo-400" /></div><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Method</label><Select value={form.method || ""} onChange={(e) => setForm({ ...form, method: e.target.value })}><option>Cash</option><option>Bkash</option><option>Nagad</option><option>Bank Transfer</option></Select></div></div>
+              <Input placeholder="Notes (Optional)" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              <div className="flex gap-3 pt-2"><Button onClick={submit} className="flex-1 py-3 text-base shadow-md">Generate Receipt</Button><Button variant="secondary" onClick={resetForm}>Reset</Button></div>
+            </div>
+            <div className="md:col-span-1 h-fit bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-5">
+              <div className="font-bold text-indigo-800 dark:text-indigo-300 border-b border-indigo-200 dark:border-indigo-700 pb-2 mb-3">Preview</div>
+              {unit ? ( <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300"> <div className="flex justify-between"><span>Unit:</span> <span className="font-medium">{unit.name}</span></div><div className="flex justify-between"><span>Rent:</span> <span>{currency(unit.rent)}</span></div><div className="flex justify-between"><span>Tenant:</span> <span className="font-medium">{unit.tenant || "Vacant"}</span></div><div className="mt-4 p-3 bg-white dark:bg-slate-800 rounded-lg border border-indigo-100 dark:border-indigo-900 text-xs text-indigo-600 dark:text-indigo-400"> Receipt <b>{form.receiptNo}</b> will be generated for <b>{form.forMonth ? formatMonth(form.forMonth) : "..."}</b>. </div></div> ) : ( <div className="text-sm text-indigo-400 italic">Select a unit to see details.</div> )}
             </div>
           </div>
         );
       }
-      /* ------------- Expenses (unchanged) ------------- */
-      function ExpensesSection({ expenses, addExpense, onDeleteExpense }) {
-        const [form, setForm] = useState({ date: todayStr() });
-        const resetForm = () => setForm({ date: todayStr() }); 
-        const submit = () => { 
-          if (!form.category || !form.amount) return alert("Fill Category and Amount");
-          addExpense({ ...form, amount: Number(form.amount || 0) }); 
-          resetForm(); 
-        }; 
 
-        const list = useMemo(() => {
-          return expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
-        }, [expenses]);
-        
+      function ExpensesSection({ expenses, addExpense, onDeleteExpense }) {
+        const [form, setForm] = useState({ date: todayStr() }); const resetForm = () => setForm({ date: todayStr() }); const submit = () => { if (!form.category || !form.amount) return alert("Fill required fields"); addExpense({ ...form, amount: Number(form.amount || 0) }); resetForm(); }; const list = useMemo(() => expenses.sort((a, b) => new Date(b.date) - new Date(a.date)), [expenses]);
         return ( 
-          <div className="grid md:grid-cols-3 gap-3 md:gap-4"> 
-            <div className="md:col-span-1 bg-slate-50 border rounded-2xl p-3 space-y-2"> 
-              <div className="font-semibold">Add Expense</div> 
-              <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={{ width: "auto", height: "auto", padding: "auto", fontSize: "16px", }} /> 
-              <Input placeholder="Category" value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} /> 
-              <Input placeholder="Vendor/Payee" value={form.vendor || ""} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /> 
-              <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} /> 
-              <Input placeholder="Notes" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /> 
-              <div className="flex gap-2"> 
-                <Button onClick={submit}>Save Expense</Button> 
-                <Button variant="secondary" onClick={resetForm}>Reset Form</Button> 
-              </div> 
+          <div className="grid lg:grid-cols-3 gap-6"> 
+            <div className="lg:col-span-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 space-y-4 h-fit"> 
+              <h3 className="font-bold text-slate-800 dark:text-slate-200">New Expense</h3> 
+              <div className="space-y-3"><div><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Date</label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /> </div><Input list="expense-categories" placeholder="Category (Type or Select)" value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} /> <Input placeholder="Vendor (Optional)" value={form.vendor || ""} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /> <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} /> <Input placeholder="Notes" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /> </div><Button onClick={submit} className="w-full">Save Expense</Button> 
             </div> 
-            <div className="md:col-span-2 overflow-auto rounded-2xl border"> 
-              <table className="min-w-full text-sm"> 
-                <thead className="bg-slate-100 text-slate-600"> 
-                  <tr> 
-                    <th className="p-3 text-left">Date</th> 
-                    <th className="p-3 text-left">Category</th> 
-                    <th className="p-3 text-left">Vendor</th> 
-                    <th className="p-3 text-right">Amount</th> 
-                    <th className="p-3 text-left">Actions</th> 
-                  </tr> 
-                </thead> 
-                <tbody> 
-                  {list.map((e) => ( 
-                    <tr key={e.id} className="border-t hover:bg-slate-50"> 
-                      <td className="p-3">{e.date}</td> 
-                      <td className="p-3 font-medium">{e.category}</td> 
-                      <td className="p-3">{e.vendor}</td> 
-                      <td className="p-3 text-right text-rose-600 font-semibold">{currency(e.amount)}</td> 
-                      <td className="p-3"> {/* NEW ACTIONS COLUMN */}
-                      <Button variant="danger" className="text-xs py-1 px-2" onClick={() => onDeleteExpense(e.id)}>
-                                        Delete
-                                    </Button>
-                                </td> 
-                    </tr> 
-                  ))} 
-                </tbody> 
-              </table> 
+            <div className="lg:col-span-2 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"> 
+              <div className="overflow-x-auto"><table className="min-w-full text-sm"> <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 text-left"> <tr> <th className="p-3">Date</th> <th className="p-3">Category</th> <th className="p-3">Note</th> <th className="p-3 text-right">Amount</th> <th className="p-3 text-center">Action</th> </tr> </thead> <tbody className="divide-y divide-slate-100 dark:divide-slate-700"> {list.map((e) => ( <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50"> <td className="p-3 text-slate-600 dark:text-slate-300">{formatDisplayDate(e.date)}</td> <td className="p-3"> <div className="font-medium text-slate-800 dark:text-slate-200">{e.category}</div> {e.vendor && <div className="text-xs text-slate-400">{e.vendor}</div>} </td><td className="p-3 text-slate-600 dark:text-slate-300 text-xs">{e.notes || "-"}</td><td className="p-3 text-right text-rose-600 dark:text-rose-400 font-medium">{currency(e.amount)}</td> <td className="p-3 text-center"><button className="text-rose-500 hover:text-rose-700" onClick={() => onDeleteExpense(e.id)}>✕</button></td> </tr> ))} </tbody> </table> </div>
             </div> 
           </div> 
-        ); 
+        );
       }
 
-      function OrgSettings({ org, updateOrg, clearOrgFields, restoreDemoOrg, clearPayments, clearExpenses, factoryReset, handleSignOut }) {
+      function OrgSettings({ org, settings, updateOrg, updateSettings, clearOrgFields, restoreDemoOrg, clearPayments, clearExpenses, factoryReset, exportData, importData }) {
+        const theme = settings?.theme || 'indigo'; const darkMode = settings?.darkMode || false;
         return (
-          <div className="grid md:grid-cols-3 gap-3 md:gap-4">
-            <div className="md:col-span-2 space-y-3 bg-slate-50 border rounded-2xl p-3">
-              <div className="font-semibold border-b pb-2">Your Organization / Property Info</div>
-              <Input placeholder="Name (e.g., Foyaz Properties)" value={org.name || ""} onChange={(e) => updateOrg({ name: e.target.value })} />
-              <Input placeholder="Address" value={org.address || ""} onChange={(e) => updateOrg({ address: e.target.value })} />
-              <Input placeholder="Phone" value={org.phone || ""} onChange={(e) => updateOrg({ phone: e.target.value })} />
-              <Input placeholder="Email" value={org.email || ""} onChange={(e) => updateOrg({ email: e.target.value })} />
-              <Input placeholder="Receipt Note" value={org.note || ""} onChange={(e) => updateOrg({ note: e.target.value })} />
-              <div className="flex gap-2 pt-1">
-                <Button variant="secondary" onClick={clearOrgFields}>Reset Org Fields</Button>
-                <Button variant="secondary" onClick={restoreDemoOrg}>Restore Demo Org</Button>
-              </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+                    <h3 className="font-bold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-3 mb-4">App Appearance</h3>
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-700 dark:text-slate-300">Dark Mode</span><button onClick={() => updateSettings({ darkMode: !darkMode })} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}><span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${darkMode ? 'translate-x-6' : 'translate-x-1'}`}/></button></div>
+                        <div><span className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-2">Color Theme</span><div className="flex gap-3 flex-wrap">{Object.entries(THEMES).map(([key, t]) => ( <button key={key} onClick={() => updateSettings({ theme: key })} className={`h-8 w-8 rounded-full border-2 flex items-center justify-center transition-all ${theme === key ? 'border-slate-600 dark:border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: t.colors[500] }} title={t.name}> {theme === key && <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>} </button> ))}</div></div>
+                    </div>
+               </div>
+               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+                    <h3 className="font-bold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-3 mb-4">Organization Info</h3>
+                    <div className="space-y-3"><Input placeholder="Name" value={org.name || ""} onChange={(e) => updateOrg({ name: e.target.value })} /><Input placeholder="Address" value={org.address || ""} onChange={(e) => updateOrg({ address: e.target.value })} /><Input placeholder="Phone" value={org.phone || ""} onChange={(e) => updateOrg({ phone: e.target.value })} /><Input placeholder="Email" value={org.email || ""} onChange={(e) => updateOrg({ email: e.target.value })} /><Input placeholder="Receipt Footer Note" value={org.note || ""} onChange={(e) => updateOrg({ note: e.target.value })} /><div className="flex gap-2 pt-2"><Button variant="secondary" onClick={clearOrgFields} className="text-xs">Clear</Button><Button variant="secondary" onClick={restoreDemoOrg} className="text-xs">Default</Button></div></div>
+               </div>
             </div>
-            <div className="space-y-3 bg-slate-50 border rounded-2xl p-3">
-              <div className="text-sm text-slate-500">Data Management / Reset</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <Button variant="danger" onClick={clearPayments}>Clear ALL Payments</Button>
-                <Button variant="danger" onClick={clearExpenses}>Clear ALL Expenses</Button>
-                <Button variant="danger" onClick={factoryReset}>Factory Reset (Everything)</Button>
-              </div>
-             <div className="text-xs text-slate-500"> • Clearing payments removes all receipts.
- <br/> • Clearing expenses removes all expense entries. <br/> • Factory Reset restores the initial demo data and removes all custom data.
-              </div>
+            <div className="space-y-4">
+                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-5">
+                        <h3 className="font-bold text-indigo-900 dark:text-indigo-300 border-b border-indigo-200 dark:border-indigo-700 pb-3 mb-4 flex items-center gap-2"><span>💾</span> Data Backup & Recovery</h3>
+                        <div className="space-y-4"><div><p className="text-xs text-indigo-700 dark:text-indigo-400 mb-2">Download a copy of all your data.</p><Button variant="primary" onClick={exportData} className="w-full">Download Backup File</Button></div><div className="border-t border-indigo-200 dark:border-indigo-700 pt-3"><p className="text-xs text-indigo-700 dark:text-indigo-400 mb-2">Restore from a backup file.</p><label className="flex items-center justify-center w-full px-4 py-2 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 rounded-lg cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition"><span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Select File to Import</span><input type="file" className="hidden" accept="application/json" onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} /></label></div></div>
+                </div>
+                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-xl p-5 h-fit">
+                    <h3 className="font-bold text-rose-800 dark:text-rose-300 border-b border-rose-200 dark:border-rose-800 pb-3 mb-4">Danger Zone</h3>
+                    <div className="space-y-3"><Button variant="danger" onClick={clearPayments} className="w-full justify-start bg-rose-500">Clear Payment History</Button><Button variant="danger" onClick={clearExpenses} className="w-full justify-start bg-rose-500">Clear Expense History</Button><div className="pt-4 mt-4 border-t border-rose-200 dark:border-rose-800"><Button variant="danger" onClick={factoryReset} className="w-full justify-start font-bold bg-rose-700">Factory Reset (Erase All)</Button></div></div><p className="text-xs text-rose-600 dark:text-rose-400 mt-3 bg-rose-100 dark:bg-rose-900/30 p-2 rounded">⚠️ Actions here are permanent.</p>
+                </div>
             </div>
           </div>
         );
       }
 
-      /* ------------- Receipt Modal (printable) (MODIFIED - Simplified and Shorter) ------------- */
+      /* ------------- Receipt Modal (Unchanged) ------------- */
       function ReceiptModal({ org, payment, unit, onClose }) {
         const ref = useRef();
-        const printNow = () => {
-          const w = window.open("", "_blank");
-          const html = renderReceiptHTML(org, payment, unit);
-          w.document.write(html);
-          w.document.close();
-          w.focus();
-          // Use setTimeout to ensure content is fully loaded before print dialog appears
-          setTimeout(() => w.print(), 200);
-        };
-        return (
-          // Reduced max-w for the preview modal to reflect the smaller physical size
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-0 md:p-6">
-            <div ref={ref} className="bg-white w-full md:max-w-xl rounded-t-2xl md:rounded-2xl shadow-xl">
-              <div className="p-3 border-b flex items-center justify-between">
-                <div className="font-semibold text-lg">Receipt #{payment.receiptNo}</div>
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={printNow}>🖨️ Print</Button>
-                  <Button variant="danger" onClick={onClose}>Close</Button>
-                </div>
-              </div>
-              <div className="p-4 md:p-6 overflow-y-auto max-h-[80vh]" dangerouslySetInnerHTML={{ __html: renderReceiptInner(org, payment, unit) }} />
-            </div>
-          </div>
-        );
+        const printNow = () => { const w = window.open("", "_blank"); w.document.write(renderReceiptHTML(org, payment, unit)); w.document.close(); w.focus(); setTimeout(() => w.print(), 200); };
+        return ( <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm"> <div ref={ref} className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95"> <div className="p-4 border-b flex items-center justify-between"> <h3 className="font-bold text-lg">Receipt #{payment.receiptNo}</h3> <div className="flex gap-2"> <Button variant="primary" onClick={printNow}>🖨️ Print</Button> <Button variant="secondary" onClick={onClose}>Close</Button> </div> </div> <div className="p-6 overflow-y-auto bg-slate-100 flex-1 flex items-center justify-center"> <div className="bg-white shadow-lg w-full max-w-[100%]" dangerouslySetInnerHTML={{ __html: renderReceiptInner(org, payment, unit) }} /> </div> </div> </div> );
       }
+      function escapeHTML(str) { return String(str || "").replace(/[&<>'"/]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;","/":"&#x2F;"}[c] || c)); }
+      function renderReceiptInner(org, payment, unit) { const unitName = unit?.name || payment.unitId || "N/A"; const formattedMonth = formatMonth(payment.forMonth); const displayDate = formatDisplayDate(payment.date); return ` <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 20px; background: white; border: 1px solid #ddd;"> <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;"> <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1> <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)}</p> </div> <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2> <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;"> <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span> <span><b>Date:</b> ${escapeHTML(displayDate)}</span> </div> <table style="width:100%; font-size:14px; border-collapse: collapse;"> <tr><td style="padding:4px 0;"><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td></tr> <tr> <td style="padding:4px 0;"><b>For Unit No:</b> ${escapeHTML(unitName)}</td> <td style="padding:4px 0;"><b>Purpose:</b> ${escapeHTML(payment.purpose || "Rent")}</td> </tr> <tr> <td style="padding:4px 0;"><b>For The Month:</b> ${escapeHTML(formattedMonth)}</td> <td style="padding:4px 0;"><b>Method:</b> ${escapeHTML(payment.method)}</td> </tr> <tr> <td style="padding:4px 0;"><b>In Words:</b> ${amountToWords(payment.amount)}</td> <td style="padding:4px 0;"><b>Amount:</b> <b style="font-size:16px;">${currency(payment.amount)}</b></td> </tr> </table> ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""} <div style="height:30px;"></div> <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;"> <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div> <div style="margin-right:10px;"><div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px; text-align:center;">Authorized Signature</div></div> </div> </div> `; }
+      function renderReceiptHTML(org, payment, unit) { return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Receipt</title><style>@media print{@page{size:A4 portrait;margin:0.5mm}body{background:white!important}.sheet{height:60mm;max-width:200mm;margin-bottom:3mm;padding:8px;page-break-after:always;border:1px dotted #ccc}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;padding:0}</style></head><body><div class="sheet">${renderReceiptInner(org, payment, unit)}</div></body></html>`; }
 
-      function escapeHTML(str) {
-        return String(str || "").replace(/[&<>'"/]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;","/":"&#x2F;"}[c] || c));
-      }
-
-      // MODIFIED: Simplified receipt structure, reduced font sizes and padding for minimal height.
-      function renderReceiptInner(org, payment, unit) {
-        const amountInWords = amountToWords(payment.amount);
-        const unitName = unit?.name || payment.unitId || "N/A";
-        const formattedMonth = formatMonth(payment.forMonth);
-
-        return `
-          <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 0;">
-            <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;">
-              <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1>
-              <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)}</p>
-            </div>
-            
-            <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2>
-            
-            <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;">
-                <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span>
-                <span><b>Date:</b> ${escapeHTML(payment.date)}</span>
-            </div>
-
-            <table style="width:100%; font-size:14px; border-collapse: collapse;">
-                <tr>
-                    <td><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td>
-                </tr>
-                <tr>
-
-                <td><b>For Unit No:</b> ${escapeHTML(unitName)}<td>
-
-                <td><b>Purpose:</b> ${escapeHTML(payment.purpose || "Rent")}</td>
-
-                </tr>
-                <tr>
-                    <td><b>For The Month:</b> ${escapeHTML(formattedMonth)}<td>
-                
-                    <td><b>Method:</b> ${escapeHTML(payment.method)}</td>
-                </tr>
-            <tr>
-       <td><b>In Words:</b> ${amountToWords(payment.amount)}<td>
-  
-       <td><b>Amount:</b> <b>${currency(payment.amount)}</b>
-  </td>
-</tr>
-</table>
-            ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""}
-            <div style="height:10px;"></div>
-
-            <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;">
-              <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div>
-              <div style="margin-right:12%;">
-                <div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px;">Authorized Signature</div>
-              </div>
-            </div>
-          </div>
-        `;
-      }
-
-      function renderReceiptHTML(org, payment, unit) {
-        return `<!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>${escapeHTML(org.name)} — Receipt ${escapeHTML(payment.receiptNo)}</title>
-          <style>
-            @media print {
-              @page { size: A4 portrait; margin: 0.5mm; } /* Minimal margin to fit more */
-              body { background:white !important; }
-              .sheet {
-                /* Set fixed size for approx 1/5 of A4 height (297mm). 55mm * 5 = 275mm */
-                height: 60mm; 
-                max-width: 200mm; 
-                margin-bottom: 3mm; /* Small space between receipts */
-                padding: 8px; /* Greatly reduced padding */
-                page-break-after: always;
-                border: 1px dotted #ccc; /* Use dotted line border for easy cutting */
-                border-radius: 0;
-                box-shadow: none;
-              }
-              /* Do not break page after the last receipt */
-              .sheet:last-child {
-                page-break-after: avoid;
-              }
-            }
-            /* Styling for screen preview */
-            body { background:white; margin:0; padding:16px; }
-            .sheet { background:white; margin: 0 auto; padding:16px; border:1px solid #e2e8f0; border-radius:12px; max-width: 600px; }
-          </style>
-        </head>
-        <body>
-          <div class="sheet">${renderReceiptInner(org, payment, unit)}</div>
-        </body>
-        </html>`;
-      }
-
- ReactDOM.createRoot(document.getElementById("root")).render(<AuthStatusWrapper />);
+      ReactDOM.createRoot(document.getElementById("root")).render(<AuthStatusWrapper />);
     </script>
   </body>
 </html>
