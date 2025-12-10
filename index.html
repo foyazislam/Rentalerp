@@ -66,7 +66,7 @@
 
     <script type="text/babel">
       const { useEffect, useMemo, useRef, useState } = React;
-
+      
       /* ------------- Firebase Setup ------------- */
       const firebaseConfig = {
         apiKey: "AIzaSyBR20axEzJjcoNNyGxxxvc6AZYrxPBQ6M4",
@@ -76,7 +76,6 @@
         messagingSenderId: "860746996508",
         appId: "1:860746996508:web:7a9360811037941725b8d9"
       };
-
       if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
       const db = firebase.firestore();
       const auth = firebase.auth();
@@ -97,6 +96,7 @@
       const formatDisplayDate = (dateStr) => { if (!dateStr) return ""; const [y, m, d] = dateStr.split('-'); return `${d}-${m}-${y}`; };
       const currency = (n) => { const num = Number(n || 0); try { return num.toLocaleString(undefined, { style: "currency", currency: "BDT" }).replace("BDT", "৳").trim(); } catch { return `৳${num.toLocaleString()}`; } };
       const formatMonth = (ym) => { if (!ym || ym.length !== 7) return "N/A"; const [year, month] = ym.split('-'); const date = new Date(year, month - 1, 1); return date.toLocaleString('default', { month: 'long', year: 'numeric' }); };
+      
       const amountToWords = (n) => {
           if (typeof n !== 'number') { n = Number(n); }
           if (isNaN(n) || n <= 0) { return "Zero Taka Only"; }
@@ -125,11 +125,13 @@
           if (words) words += ' Only';
           return words.replace(/\s+/g, ' ').trim() || "Zero Taka Only";
       };
+
       const monthKey = (dateStr) => { const d = new Date(dateStr); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
       const nextReceiptNo = (allPayments) => { const yyyymm = monthKey(new Date().toISOString()); const prefix = `RC-${yyyymm}-`; const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1; return `${prefix}${String(count).padStart(4, "0")}`; };
       const download = (text) => { const filename = "rental-erp-backup.json"; const blob = new Blob([text], { type: "application/json;charset=utf-8;" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); };
       const classNames = (...c) => c.filter(Boolean).join(" ");
       if (!(window.crypto && window.crypto.randomUUID)) { window.crypto = window.crypto || {}; window.crypto.randomUUID = function () { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { const r = (Math.random() * 16) | 0; const v = c === 'x' ? r : (r & 0x3) | 0x8; return v.toString(16); }); }; }
+      
       const shouldShowReminder = (dueDay) => { const today = new Date(); const currentDay = today.getDate(); return Math.abs(currentDay - Number(dueDay)) === 2; }
       const createWhatsAppLink = (tenantPhone, unitName, orgName, dueDay, rentAmount) => { if (!tenantPhone || !unitName) return null; const phone = tenantPhone.replace(/\D/g, ''); const rent = currency(rentAmount); const message = `*Rent Reminder from ${orgName}*\n\nDear tenant of ${unitName},\n\nThis is a friendly reminder that your monthly rent of ${rent} is due in 2 days (on the ${dueDay}th of the month).\n\nPlease make the payment before the due date.\nThank you!`; return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`; };
 
@@ -146,13 +148,11 @@
       const loadData = async (uid = "TEST_USER_ID") => { try { const rawLocal = localStorage.getItem(localStorageKey); if (rawLocal) { const parsed = JSON.parse(rawLocal); await saveData(parsed, uid); localStorage.removeItem(localStorageKey); alert("Local data migrated to the cloud successfully!"); return { ...initialData, ...parsed }; } const docPath = `erp_data/${uid}`; const docRef = db.doc(docPath); const doc = await docRef.get(); if (doc.exists) return { ...initialData, ...doc.data() }; await saveData(initialData, uid); return initialData; } catch (e) { console.error("Cloud Load error", e); return initialData; } };
       const saveData = async (data, uid = "TEST_USER_ID") => { if (!uid) return; try { const docPath = `erp_data/${uid}`; await db.doc(docPath).set({ org: data.org, settings: data.settings || { theme: 'indigo', darkMode: false }, units: data.units, payments: data.payments, expenses: data.expenses, }); } catch (e) { console.error("Cloud Save error", e); alert("Warning: Data failed to save to the cloud."); } };
       
-      // FIXED SECURITY: Now includes USER ID in the file path to prevent data mixing between friends sharing the app
       const uploadFile = async (file, unitId, type) => { 
           const user = auth.currentUser;
           if (!user) { alert("You must be logged in to upload files."); return null; }
-          const storageRef = storage.ref(); 
-          // Path is now: tenant_docs/USER_UID/UNIT_ID/...
-          const path = `tenant_docs/${user.uid}/${unitId}/${type}/${file.name}`; 
+          const storageRef = storage.ref();
+          const path = `tenant_docs/${user.uid}/${unitId}/${type}/${file.name}`;
           const snapshot = await storageRef.child(path).put(file); 
           return await snapshot.ref.getDownloadURL(); 
       };
@@ -174,7 +174,7 @@
             {...props}
             min={props.type === 'number' ? "0" : undefined}
             className={classNames(
-              "w-full rounded-lg border px-3 py-3 text-base shadow-sm transition-colors", // Text-base ensures 16px font on mobile
+              "w-full rounded-lg border px-3 py-3 text-base shadow-sm transition-colors",
               "border-slate-300 bg-white text-slate-700 placeholder:text-slate-400",
               "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500",
               "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",
@@ -251,8 +251,7 @@
               <div className="space-y-1 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
                   <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</label>
                   <div className="flex items-center gap-2">
-                      <input 
-                          type="file" ref={fileInputRef} onChange={handleFileChange} disabled={uploading || !unitId} 
+                      <input type="file" ref={fileInputRef} onChange={handleFileChange} disabled={uploading || !unitId} 
                           className="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-2 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900 dark:file:text-indigo-200 hover:file:bg-indigo-100"
                       />
                       {currentUrl && (
@@ -277,7 +276,7 @@
         const [deleteRequest, setDeleteRequest] = useState(null); 
         const [showSettingsPrompt, setShowSettingsPrompt] = useState(false);
         const uid = currentUser?.uid || "TEST_USER_ID";
-
+        
         useEffect(() => {
             const settings = data.settings || { theme: 'indigo', darkMode: false };
             const themeKey = settings.theme || 'indigo';
@@ -286,7 +285,7 @@
             Object.entries(themeColors).forEach(([shade, value]) => { root.style.setProperty(`--theme-${shade}`, value); });
             if (settings.darkMode) { root.classList.add('dark'); } else { root.classList.remove('dark'); }
         }, [data.settings]);
-
+        
         const updateSettings = (patch) => { setData(d => ({ ...d, settings: { ...(d.settings || {}), ...patch } })); };
         const isPasswordCorrect = async (password) => { if (!currentUser?.email) return false; try { await auth.signInWithEmailAndPassword(currentUser.email, password); return true; } catch { return false; } };
         const deletePayment = (id) => { setData((d) => ({ ...d, payments: d.payments.filter((p) => p.id !== id) })); setDeleteRequest(null); alert("Payment deleted."); };
@@ -295,7 +294,7 @@
         useEffect(() => { setLoading(true); loadData(uid).then(init => { setData(init); setLoading(false); }); }, [uid]);
         const saveTimeout = useRef(null);
         useEffect(() => { if (loading || !uid) return; if (saveTimeout.current) clearTimeout(saveTimeout.current); saveTimeout.current = setTimeout(() => { saveData(data, uid); }, 500); return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); }; }, [data, loading, uid]);
-
+        
         const units = data.units; const payments = data.payments; const expenses = data.expenses; const org = data.org;
         const totals = useMemo(() => { const income = payments.reduce((s, p) => s + Number(p.amount || 0), 0); const expense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0); return { income, expense, net: income - expense }; }, [payments, expenses]);
         const outstandingByUnit = useMemo(() => { const now = new Date(); const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; const map = Object.fromEntries(units.map((u) => [u.id, u.rent || 0])); payments.filter((p) => (p.forMonth || "").startsWith(ym)).forEach((p) => { map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0); }); return map; }, [units, payments]);
@@ -315,7 +314,7 @@
         const clearExpenses = () => setData((d) => ({ ...d, expenses: [] }));
         const factoryReset = () => { setData({ ...initialData }); };
         const handleSignOut = async () => { try { await auth.signOut(); } catch { alert("Failed to sign out."); } };
-
+        
         return (
           <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 pb-safe-bottom transition-colors duration-300">
             {loading && <div className="fixed inset-0 bg-white/80 dark:bg-slate-900/80 z-50 flex items-center justify-center backdrop-blur-sm"><div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>}
@@ -350,7 +349,7 @@
               {tab === "units" && <Section title="Manage Units" right={<Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-48" />}><UnitsTable units={filteredUnits} upsertUnit={upsertUnit} deleteUnit={deleteUnit} /></Section>}
               {tab === "payments" && <Section title="Transaction History"><PaymentsTable payments={payments} units={units} onRowClick={setShowReceipt} onDelete={(id) => setDeleteRequest({ type: 'payment', id })} /></Section>}
               {tab === "newReceipt" && <Section title="New Money Receipt"><NewReceiptForm units={units} addPayment={addPayment} data={data} /></Section>}
-              {tab === "statement" && <Section title="Financial Statement"><DateRangeStatement payments={payments} expenses={expenses} /></Section>}
+              {tab === "statement" && <Section title="Financial Statement"><DateRangeStatement payments={payments} expenses={expenses} org={data.org} /></Section>}
               {tab === "expenses" && <Section title="Expense Tracker"><ExpensesSection expenses={expenses} addExpense={addExpense} onDeleteExpense={(id) => setDeleteRequest({ type: 'expense', id })} /></Section>}
               {tab === "settings" && <Section title="System Settings"><OrgSettings org={data.org} settings={data.settings} updateOrg={updateOrg} updateSettings={updateSettings} clearOrgFields={clearOrgFields} restoreDemoOrg={restoreDemoOrg} clearPayments={() => { if (confirm("Clear ALL payments?")) clearPayments(); }} clearExpenses={() => { if (confirm("Clear ALL expenses?")) clearExpenses(); }} factoryReset={() => { if (confirm("Factory Reset?")) factoryReset(); }} exportData={exportData} importData={importData} /></Section>}
               {showReceipt && <ReceiptModal org={data.org} payment={showReceipt} unit={units.find((u) => u.id === showReceipt.unitId)} onClose={() => setShowReceipt(null)} />}
@@ -361,9 +360,10 @@
         );
       }
 
-      /* ------------- Modal Components (Mobile Optimized: Bottom Sheet) ------------- */
+      /* ------------- Modal Components ------------- */
       function PasswordPromptModal({ currentUser, isPasswordCorrect, onClose, onSuccess, actionLabel }) {
-          const [password, setPassword] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
+          const [password, setPassword] = useState("");
+          const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
           const handleSubmit = async (e) => { e.preventDefault(); if (!currentUser) { onSuccess(); return; } setLoading(true); setError(""); const correct = await isPasswordCorrect(password); setLoading(false); if (correct) onSuccess(); else { setError("Incorrect password."); setPassword(""); } };
           return (
               <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm transition-all">
@@ -384,7 +384,8 @@
       }
 
       function LoginScreen({ setAuthError }) {
-          const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [loading, setLoading] = useState(false);
+          const [email, setEmail] = useState("");
+          const [password, setPassword] = useState(""); const [loading, setLoading] = useState(false);
           const handleLogin = async (e) => { e.preventDefault(); setLoading(true); try { await auth.signInWithEmailAndPassword(email, password); } catch { setAuthError("Invalid credentials."); } finally { setLoading(false); } };
           return (
               <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4 transition-colors duration-300">
@@ -397,7 +398,11 @@
           );
       }
 
-      function AuthStatusWrapper() { const [currentUser, setCurrentUser] = useState(null); const [loading, setLoading] = useState(true); useEffect(() => { const unsub = auth.onAuthStateChanged(u => { setCurrentUser(u); setLoading(false); }); return unsub; }, []); if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>; if (!currentUser) return <LoginScreen setAuthError={(e) => alert(e)} />; return <App currentUser={currentUser} />; }
+      function AuthStatusWrapper() { const [currentUser, setCurrentUser] = useState(null); const [loading, setLoading] = useState(true);
+        useEffect(() => { const unsub = auth.onAuthStateChanged(u => { setCurrentUser(u); setLoading(false); }); return unsub; }, []);
+        if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>;
+        if (!currentUser) return <LoginScreen setAuthError={(e) => alert(e)} />; return <App currentUser={currentUser} />;
+      }
      
       /* ------------- Dashboard ------------- */
       function DashboardSection({ totals, units, outstandingByUnit, unitsForReminder, setTab }) { 
@@ -421,12 +426,13 @@
                 <div className="md:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
                     <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><span>🔔</span> Pending Reminders {unitsForReminder.length > 0 && <span className="bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-200 text-xs px-2 py-0.5 rounded-full">{unitsForReminder.length}</span>}</h3>
                     <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
-                        {unitsForReminder.length === 0 ? ( <p className="text-slate-500 dark:text-slate-400 text-sm italic">No reminders due today.</p> ) : ( unitsForReminder.map(u => ( <div key={u.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-100 dark:border-slate-600"> <div> <div className="font-medium text-sm text-slate-800 dark:text-slate-200">{u.name} <span className="text-slate-400">|</span> {u.tenant}</div> <div className="text-xs text-slate-500 dark:text-slate-400">Due: {u.dueDay}th</div> </div> <a href={u.whatsappLink} target="_blank" className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 p-2 rounded-full transition"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg></a> </div> )) )}
+                        {unitsForReminder.length === 0 ?
+                        ( <p className="text-slate-500 dark:text-slate-400 text-sm italic">No reminders due today.</p> ) : ( unitsForReminder.map(u => ( <div key={u.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-100 dark:border-slate-600"> <div> <div className="font-medium text-sm text-slate-800 dark:text-slate-200">{u.name} <span className="text-slate-400">|</span> {u.tenant}</div> <div className="text-xs text-slate-500 dark:text-slate-400">Due: {u.dueDay}th</div> </div> <a href={u.whatsappLink} target="_blank" className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 p-2 rounded-full transition"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg></a> </div> )) )}
                     </div>
                 </div>
             </div>
             <Section title="Unit Status & Dues">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {units.map((u) => ( <div key={u.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-600 bg-white dark:bg-slate-700/50 hover:border-indigo-200 transition group"> <div> <div className="font-medium flex items-center gap-2 text-slate-700 dark:text-slate-200"> {u.name} {!u.tenant && <span className="text-[10px] bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-slate-500">Vacant</span>} </div> <div className="text-xs text-slate-400 mt-0.5">{u.tenant || "—"}</div> </div> <div className={classNames("font-bold text-sm", outstandingByUnit[u.id] > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}> {currency(outstandingByUnit[u.id])} </div> </div> ))}
               </div>
             </Section>
@@ -435,24 +441,163 @@
       }
       
       /* ------------- Tables & Lists ------------- */
-      function DateRangeStatement({ payments, expenses }) {
+      function DateRangeStatement({ payments, expenses, org }) {
         const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10);
-        const [startDate, setStartDate] = useState(getFirstDayOfMonth(new Date())); const [endDate, setEndDate] = useState(todayStr());
+        const [startDate, setStartDate] = useState(getFirstDayOfMonth(new Date())); 
+        const [endDate, setEndDate] = useState(todayStr());
+        const [filterType, setFilterType] = useState("All"); // "All", "Income", "Expense"
+
         const filteredData = useMemo(() => {
             const getLocalDateTimestamp = (dateStr) => { if (!dateStr) return 0; const parts = dateStr.split('-'); return new Date(parts[0], parts[1] - 1, parts[2]).getTime(); };
-            const start = getLocalDateTimestamp(startDate); const end = getLocalDateTimestamp(endDate) + 86400000;
+            const start = getLocalDateTimestamp(startDate); 
+            const end = getLocalDateTimestamp(endDate) + 86400000;
+            
             const incomeList = payments.filter(p => { const d = getLocalDateTimestamp(p.date); return d >= start && d < end; });
             const expenseList = expenses.filter(e => { const d = getLocalDateTimestamp(e.date); return d >= start && d < end; });
+            
+            let combinedList = [ 
+                ...incomeList.map(p => ({ id: `P-${p.id}`, rawDate: p.date, description: `${p.purpose || "Rent"} - ${p.unitId} (${p.tenant})`, type: 'Income', amount: Number(p.amount || 0) })), 
+                ...expenseList.map(e => ({ id: `E-${e.id}`, rawDate: e.date, description: `${e.category} (${e.vendor || '-'})`, type: 'Expense', amount: -Number(e.amount || 0) })), 
+            ].sort((a, b) => new Date(a.rawDate) - new Date(b.rawDate));
+
+            // Apply Filter
+            if (filterType === "Income") {
+                combinedList = combinedList.filter(i => i.type === 'Income');
+            } else if (filterType === "Expense") {
+                combinedList = combinedList.filter(i => i.type === 'Expense');
+            }
+
             let runningBalance = 0;
-            const combinedList = [ ...incomeList.map(p => ({ id: `P-${p.id}`, rawDate: p.date, description: `${p.purpose || "Rent"} - ${p.unitId} (${p.tenant})`, type: 'Income', amount: Number(p.amount || 0) })), ...expenseList.map(e => ({ id: `E-${e.id}`, rawDate: e.date, description: `${e.category} (${e.vendor || '-'})`, type: 'Expense', amount: -Number(e.amount || 0) })), ].sort((a, b) => new Date(a.rawDate) - new Date(b.rawDate)).map(item => { runningBalance += item.amount; return { ...item, balance: runningBalance, displayAmount: Math.abs(item.amount) }; });
-            return { combinedList, totalIncome: incomeList.reduce((sum, p) => sum + Number(p.amount || 0), 0), totalExpense: expenseList.reduce((sum, e) => sum + Number(e.amount || 0), 0), netProfit: incomeList.reduce((sum, p) => sum + Number(p.amount || 0), 0) - expenseList.reduce((sum, e) => sum + Number(e.amount || 0), 0) };
-        }, [payments, expenses, startDate, endDate]);
+            const finalList = combinedList.map(item => { 
+                runningBalance += item.amount; 
+                return { ...item, balance: runningBalance, displayAmount: Math.abs(item.amount) }; 
+            });
+
+            return { 
+                combinedList: finalList, 
+                totalIncome: incomeList.reduce((sum, p) => sum + Number(p.amount || 0), 0), 
+                totalExpense: expenseList.reduce((sum, e) => sum + Number(e.amount || 0), 0), 
+                netProfit: incomeList.reduce((sum, p) => sum + Number(p.amount || 0), 0) - expenseList.reduce((sum, e) => sum + Number(e.amount || 0), 0) 
+            };
+        }, [payments, expenses, startDate, endDate, filterType]);
+
+        const printStatement = () => {
+            const w = window.open("", "_blank");
+            const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Statement</title>
+              <style>
+                body { font-family: sans-serif; font-size: 12px; padding: 20px; }
+                .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+                .header h1 { margin: 0; font-size: 20px; }
+                .header p { margin: 2px 0; color: #555; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+                th { background: #f0f0f0; }
+                .text-right { text-align: right; }
+                .summary { margin-top: 20px; display: flex; justify-content: flex-end; gap: 20px; font-weight: bold; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1>${escapeHTML(org.name)}</h1>
+                <p>${escapeHTML(org.address)}</p>
+                <p>Phone: ${escapeHTML(org.phone)}</p>
+                <h3>Financial Statement (${filterType})</h3>
+                <p>From: ${formatDisplayDate(startDate)} To: ${formatDisplayDate(endDate)}</p>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 40px">S.N.</th>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Type</th>
+                    <th class="text-right">Amount</th>
+                    ${filterType === 'All' ? '<th class="text-right">Balance</th>' : ''}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${filteredData.combinedList.map((item, index) => `
+                    <tr>
+                      <td>${index + 1}</td>
+                      <td>${formatDisplayDate(item.rawDate)}</td>
+                      <td>${escapeHTML(item.description)}</td>
+                      <td>${item.type}</td>
+                      <td class="text-right">${currency(item.displayAmount)}</td>
+                      ${filterType === 'All' ? `<td class="text-right">${currency(item.balance)}</td>` : ''}
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              <div class="summary">
+                ${filterType !== 'Expense' ? `<div>Total Income: ${currency(filteredData.totalIncome)}</div>` : ''}
+                ${filterType !== 'Income' ? `<div>Total Expense: ${currency(filteredData.totalExpense)}</div>` : ''}
+                ${filterType === 'All' ? `<div>Net Profit: ${currency(filteredData.netProfit)}</div>` : ''}
+              </div>
+              <script>window.print();<\/script>
+            </body>
+            </html>
+            `;
+            w.document.write(html);
+            w.document.close();
+        };
 
         return (
             <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row gap-4 bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600"><div className="flex-1"><label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 block">From</label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div><div className="flex-1"><label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 block">To</label><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div></div>
-                <div className="grid grid-cols-3 gap-2 md:gap-4"><div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 text-center"><div className="text-xs text-emerald-600 dark:text-emerald-400 uppercase font-bold">Income</div><div className="text-lg md:text-xl font-bold text-emerald-700 dark:text-emerald-300">{currency(filteredData.totalIncome)}</div></div><div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-xl border border-rose-100 dark:border-rose-800 text-center"><div className="text-xs text-rose-600 dark:text-rose-400 uppercase font-bold">Expense</div><div className="text-lg md:text-xl font-bold text-rose-700 dark:text-rose-300">{currency(filteredData.totalExpense)}</div></div><div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 text-center"><div className="text-xs text-indigo-600 dark:text-indigo-400 uppercase font-bold">Net</div><div className="text-lg md:text-xl font-bold text-indigo-700 dark:text-indigo-300">{currency(filteredData.netProfit)}</div></div></div>
-                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="min-w-full text-xs md:text-sm"><thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700"><tr><th className="p-3 text-left">Date</th><th className="p-3 text-left">Description</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Balance</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{filteredData.combinedList.length === 0 ? ( <tr><td colSpan="4" className="p-8 text-center text-slate-400">No transactions in this period.</td></tr> ) : ( filteredData.combinedList.map((item) => ( <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition"> <td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{formatDisplayDate(item.rawDate)}</td> <td className="p-3 max-w-[150px] truncate text-slate-700 dark:text-slate-200">{item.description}</td> <td className={`p-3 text-right font-medium ${item.type === 'Income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}> {item.type === 'Expense' ? '-' : '+'}{currency(item.displayAmount)} </td> <td className="p-3 text-right text-slate-500 dark:text-slate-400 font-mono">{currency(item.balance)}</td> </tr> )) )}</tbody></table></div></div>
+                <div className="flex flex-col md:flex-row gap-4 bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
+                    <div className="flex-1"><label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 block">From</label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+                    <div className="flex-1"><label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 block">To</label><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
+                    <div className="w-full md:w-48"><label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 block">Type</label>
+                        <Select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                            <option value="All">All Transactions</option>
+                            <option value="Income">Income Only</option>
+                            <option value="Expense">Expense Only</option>
+                        </Select>
+                    </div>
+                    <div className="flex items-end">
+                        <Button onClick={printStatement} className="w-full md:w-auto h-[46px] flex items-center gap-2 justify-center">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                            Print
+                        </Button>
+                    </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 md:gap-4">
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 text-center"><div className="text-xs text-emerald-600 dark:text-emerald-400 uppercase font-bold">Income</div><div className="text-lg md:text-xl font-bold text-emerald-700 dark:text-emerald-300">{currency(filteredData.totalIncome)}</div></div>
+                    <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-xl border border-rose-100 dark:border-rose-800 text-center"><div className="text-xs text-rose-600 dark:text-rose-400 uppercase font-bold">Expense</div><div className="text-lg md:text-xl font-bold text-rose-700 dark:text-rose-300">{currency(filteredData.totalExpense)}</div></div>
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 text-center"><div className="text-xs text-indigo-600 dark:text-indigo-400 uppercase font-bold">Net</div><div className="text-lg md:text-xl font-bold text-indigo-700 dark:text-indigo-300">{currency(filteredData.netProfit)}</div></div>
+                </div>
+                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs md:text-sm">
+                            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
+                                <tr>
+                                    <th className="p-3 text-center w-10">S.N.</th>
+                                    <th className="p-3 text-left">Date</th>
+                                    <th className="p-3 text-left">Description</th>
+                                    <th className="p-3 text-right">Amount</th>
+                                    <th className="p-3 text-right">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                {filteredData.combinedList.length === 0 ? 
+                                    ( <tr><td colSpan="5" className="p-8 text-center text-slate-400">No transactions found.</td></tr> ) : 
+                                    ( filteredData.combinedList.map((item, index) => ( 
+                                        <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition"> 
+                                            <td className="p-3 text-center text-slate-400">{index + 1}</td>
+                                            <td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{formatDisplayDate(item.rawDate)}</td> 
+                                            <td className="p-3 max-w-[150px] truncate text-slate-700 dark:text-slate-200">{item.description}</td> 
+                                            <td className={`p-3 text-right font-medium ${item.type === 'Income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}> {item.type === 'Expense' ? '-' : '+'}{currency(item.displayAmount)} </td> 
+                                            <td className="p-3 text-right text-slate-500 dark:text-slate-400 font-mono">{currency(item.balance)}</td> 
+                                        </tr> 
+                                    )) )
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         );
       }
@@ -460,8 +605,10 @@
       function StatCard({ label, value, color, icon }) { return ( <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between"> <div> <div className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wide">{label}</div> <div className={`text-xl md:text-2xl font-bold ${color} mt-1`}>{value}</div> </div> <div className="text-2xl opacity-80">{icon}</div> </div> ); }
 
       function UnitsTable({ units, upsertUnit, deleteUnit }) {
-        const [unitForm, setUnitForm] = useState({}); const [showProfileId, setShowProfileId] = useState(null); const profileUnit = units.find(u => u.id === showProfileId);
-        const reset = () => setUnitForm({}); const submit = () => { if (!unitForm.id || !unitForm.name) return alert("Fill ID and Name"); upsertUnit({ ...unitForm, rent: Number(unitForm.rent || 0), dueDay: Number(unitForm.dueDay || 1) }); reset(); };
+        const [unitForm, setUnitForm] = useState({});
+        const [showProfileId, setShowProfileId] = useState(null); const profileUnit = units.find(u => u.id === showProfileId);
+        const reset = () => setUnitForm({});
+        const submit = () => { if (!unitForm.id || !unitForm.name) return alert("Fill ID and Name"); upsertUnit({ ...unitForm, rent: Number(unitForm.rent || 0), dueDay: Number(unitForm.dueDay || 1) }); reset(); };
         return (
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700 rounded-xl p-5 space-y-4 h-fit">
@@ -500,11 +647,49 @@
 
       function PaymentsTable({ payments, units, onRowClick, onDelete }) {
         const [search, setSearch] = useState("");
-        const filtered = useMemo(() => { if (!search) return payments; const q = search.toLowerCase(); return payments.filter(p => (p.receiptNo || "").toLowerCase().includes(q) || (p.tenant || "").toLowerCase().includes(q)).sort((a, b) => new Date(b.date) - new Date(a.date)); }, [payments, search]);
+        const filtered = useMemo(() => { 
+            if (!search) return payments; 
+            const q = search.toLowerCase(); 
+            return payments.filter(p => (p.receiptNo || "").toLowerCase().includes(q) || (p.tenant || "").toLowerCase().includes(q)).sort((a, b) => new Date(b.date) - new Date(a.date)); 
+        }, [payments, search]);
+
         return (
             <div className="space-y-4">
             <Input placeholder="Search receipt number or tenant..." value={search} onChange={(e) => setSearch(e.target.value)} />
-            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 text-left"><tr><th className="p-3">Date</th><th className="p-3">Receipt</th><th className="p-3">Tenant</th><th className="p-3 text-right">Amount</th><th className="p-3 text-center">Action</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{filtered.map((p) => ( <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50"><td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{formatDisplayDate(p.date)}</td><td className="p-3 font-mono text-xs text-slate-500 dark:text-slate-400">{p.receiptNo}</td><td className="p-3"><div className="font-medium text-slate-800 dark:text-slate-200">{p.tenant}</div><div className="text-xs text-slate-400">{units.find(u => u.id === p.unitId)?.name || p.unitId}</div></td><td className="p-3 text-right font-medium text-slate-700 dark:text-slate-200">{currency(p.amount)}</td><td className="p-3 flex justify-center gap-2"><button className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 px-2 py-1 rounded text-xs" onClick={() => onRowClick(p)}>Print</button><button className="bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 px-2 py-1 rounded text-xs" onClick={() => onDelete(p.id)}>Del</button></td></tr> ))}</tbody></table></div></div>
+            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                        <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 text-left">
+                            <tr>
+                                <th className="p-3 w-10 text-center">S.N.</th>
+                                <th className="p-3">Date</th>
+                                <th className="p-3">Receipt</th>
+                                <th className="p-3">Tenant</th>
+                                <th className="p-3 text-right">Amount</th>
+                                <th className="p-3 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {filtered.map((p, i) => ( 
+                                <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                    <td className="p-3 text-center text-xs text-slate-400">{i + 1}</td>
+                                    <td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{formatDisplayDate(p.date)}</td>
+                                    <td className="p-3 font-mono text-xs text-slate-500 dark:text-slate-400">{p.receiptNo}</td>
+                                    <td className="p-3">
+                                        <div className="font-medium text-slate-800 dark:text-slate-200">{p.tenant}</div>
+                                        <div className="text-xs text-slate-400">{units.find(u => u.id === p.unitId)?.name || p.unitId}</div>
+                                    </td>
+                                    <td className="p-3 text-right font-medium text-slate-700 dark:text-slate-200">{currency(p.amount)}</td>
+                                    <td className="p-3 flex justify-center gap-2">
+                                        <button className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 px-2 py-1 rounded text-xs" onClick={() => onRowClick(p)}>Print</button>
+                                        <button className="bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 px-2 py-1 rounded text-xs" onClick={() => onDelete(p.id)}>Del</button>
+                                    </td>
+                                </tr> 
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
             </div>
         );
       }
@@ -534,15 +719,57 @@
       }
 
       function ExpensesSection({ expenses, addExpense, onDeleteExpense }) {
-        const [form, setForm] = useState({ date: todayStr() }); const resetForm = () => setForm({ date: todayStr() }); const submit = () => { if (!form.category || !form.amount) return alert("Fill required fields"); addExpense({ ...form, amount: Number(form.amount || 0) }); resetForm(); }; const list = useMemo(() => expenses.sort((a, b) => new Date(b.date) - new Date(a.date)), [expenses]);
+        const [form, setForm] = useState({ date: todayStr() });
+        const resetForm = () => setForm({ date: todayStr() }); 
+        
+        const submit = () => { 
+            if (!form.category || !form.amount) return alert("Fill required fields");
+            addExpense({ ...form, amount: Number(form.amount || 0) }); 
+            resetForm(); 
+        }; 
+        
+        const list = useMemo(() => expenses.sort((a, b) => new Date(b.date) - new Date(a.date)), [expenses]);
+
         return ( 
           <div className="grid lg:grid-cols-3 gap-6"> 
             <div className="lg:col-span-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 space-y-4 h-fit"> 
               <h3 className="font-bold text-slate-800 dark:text-slate-200">New Expense</h3> 
-              <div className="space-y-3"><div><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Date</label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /> </div><Input placeholder="Category (e.g. Utility)" value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} /> <Input placeholder="Vendor (Optional)" value={form.vendor || ""} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /> <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} /> <Input placeholder="Notes" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /> </div><Button onClick={submit} className="w-full">Save Expense</Button> 
+              <div className="space-y-3">
+                  <div><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Date</label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /> </div>
+                  <Input placeholder="Category (e.g. Utility)" value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} /> 
+                  <Input placeholder="Vendor (Optional)" value={form.vendor || ""} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /> 
+                  <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} /> 
+                  <Input placeholder="Notes" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /> 
+              </div>
+              <Button onClick={submit} className="w-full">Save Expense</Button> 
             </div> 
             <div className="lg:col-span-2 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"> 
-              <div className="overflow-x-auto"><table className="min-w-full text-sm"> <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 text-left"> <tr> <th className="p-3">Date</th> <th className="p-3">Category</th> <th className="p-3">Note</th> <th className="p-3 text-right">Amount</th> <th className="p-3 text-center">Action</th> </tr> </thead> <tbody className="divide-y divide-slate-100 dark:divide-slate-700"> {list.map((e) => ( <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50"> <td className="p-3 text-slate-600 dark:text-slate-300">{formatDisplayDate(e.date)}</td> <td className="p-3"> <div className="font-medium text-slate-800 dark:text-slate-200">{e.category}</div> {e.vendor && <div className="text-xs text-slate-400">{e.vendor}</div>} </td><td className="p-3 text-slate-600 dark:text-slate-300 text-xs">{e.notes || "-"}</td><td className="p-3 text-right text-rose-600 dark:text-rose-400 font-medium">{currency(e.amount)}</td> <td className="p-3 text-center"><button className="text-rose-500 hover:text-rose-700" onClick={() => onDeleteExpense(e.id)}>✕</button></td> </tr> ))} </tbody> </table> </div>
+              <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm"> 
+                      <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 text-left"> 
+                          <tr> 
+                              <th className="p-3 w-10 text-center">S.N.</th>
+                              <th className="p-3">Date</th> 
+                              <th className="p-3">Category</th> 
+                              <th className="p-3">Note</th> 
+                              <th className="p-3 text-right">Amount</th> 
+                              <th className="p-3 text-center">Action</th> 
+                          </tr> 
+                      </thead> 
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-700"> 
+                          {list.map((e, i) => ( 
+                              <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50"> 
+                                  <td className="p-3 text-center text-xs text-slate-400">{i + 1}</td>
+                                  <td className="p-3 text-slate-600 dark:text-slate-300">{formatDisplayDate(e.date)}</td> 
+                                  <td className="p-3"> <div className="font-medium text-slate-800 dark:text-slate-200">{e.category}</div> {e.vendor && <div className="text-xs text-slate-400">{e.vendor}</div>} </td>
+                                  <td className="p-3 text-slate-600 dark:text-slate-300 text-xs">{e.notes || "-"}</td>
+                                  <td className="p-3 text-right text-rose-600 dark:text-rose-400 font-medium">{currency(e.amount)}</td> 
+                                  <td className="p-3 text-center"><button className="text-rose-500 hover:text-rose-700" onClick={() => onDeleteExpense(e.id)}>✕</button></td> 
+                              </tr> 
+                          ))} 
+                      </tbody> 
+                  </table> 
+              </div>
             </div> 
           </div> 
         );
@@ -567,7 +794,7 @@
             </div>
             <div className="space-y-4">
                 <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-5">
-                        <h3 className="font-bold text-indigo-900 dark:text-indigo-300 border-b border-indigo-200 dark:border-indigo-700 pb-3 mb-4 flex items-center gap-2"><span>💾</span> Data Backup & Recovery</h3>
+                    <h3 className="font-bold text-indigo-900 dark:text-indigo-300 border-b border-indigo-200 dark:border-indigo-700 pb-3 mb-4 flex items-center gap-2"><span>💾</span> Data Backup & Recovery</h3>
                         <div className="space-y-4"><div><p className="text-xs text-indigo-700 dark:text-indigo-400 mb-2">Download a copy of all your data.</p><Button variant="primary" onClick={exportData} className="w-full">Download Backup File</Button></div><div className="border-t border-indigo-200 dark:border-indigo-700 pt-3"><p className="text-xs text-indigo-700 dark:text-indigo-400 mb-2">Restore from a backup file.</p><label className="flex items-center justify-center w-full px-4 py-2 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 rounded-lg cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition"><span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Select File to Import</span><input type="file" className="hidden" accept="application/json" onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} /></label></div></div>
                 </div>
                 <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-xl p-5 h-fit">
@@ -579,7 +806,7 @@
         );
       }
 
-      /* ------------- Receipt Modal (Unchanged) ------------- */
+      /* ------------- Receipt Modal ------------- */
       function ReceiptModal({ org, payment, unit, onClose }) {
         const ref = useRef();
         const printNow = () => { const w = window.open("", "_blank"); w.document.write(renderReceiptHTML(org, payment, unit)); w.document.close(); w.focus(); setTimeout(() => w.print(), 200); };
@@ -591,7 +818,7 @@
           const formattedMonth = formatMonth(payment.forMonth); 
           const displayDate = formatDisplayDate(payment.date); 
           const displayPurpose = (payment.purpose === "Rent" || !payment.purpose) ? "Rent And Service Charge" : payment.purpose;
-          return ` <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 20px; background: white; border: 1px solid #ddd;"> <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;"> <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1> <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)}</p> </div> <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2> <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;"> <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span> <span><b>Date:</b> ${escapeHTML(displayDate)}</span> </div> <table style="width:100%; font-size:14px; border-collapse: collapse;"> <tr><td style="padding:4px 0;"><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td></tr> <tr> <td style="padding:4px 0;"><b>For Unit No:</b> ${escapeHTML(unitName)}</td> <td style="padding:4px 0;"><b>Purpose:</b> ${escapeHTML(displayPurpose)}</td> </tr> <tr> <td style="padding:4px 0;"><b>For The Month:</b> ${escapeHTML(formattedMonth)}</td> <td style="padding:4px 0;"><b>Method:</b> ${escapeHTML(payment.method)}</td> </tr> <tr> <td style="padding:4px 0;"><b>In Words:</b> ${amountToWords(payment.amount)}</td> <td style="padding:4px 0;"><b>Amount:</b> <b style="font-size:16px;">${currency(payment.amount)}</b></td> </tr> </table> ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""} <div style="height:30px;"></div> <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;"> <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div> <div style="margin-right:10px;"><div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px; text-align:center;">Authorized Signature</div></div> </div> </div> `; 
+          return ` <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 20px; background: white; border: 1px solid #ddd;"> <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;"> <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1> <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)}</p> </div> <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2> <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;"> <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span> <span><b>Date:</b> ${escapeHTML(displayDate)}</span> </div> <table style="width:100%; font-size:14px; border-collapse: collapse;"> <tr><td style="padding:4px 0;"><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td></tr> <tr> <td style="padding:4px 0;"><b>For Unit No:</b> ${escapeHTML(unitName)}</td> <td style="padding:4px 0;"><b>Purpose:</b> ${escapeHTML(displayPurpose)}</td> </tr> <tr> <td style="padding:4px 0;"><b>For The Month:</b> ${escapeHTML(formattedMonth)}</td> <td style="padding:4px 0;"><b>Method:</b> ${escapeHTML(payment.method)}</td> </tr> <tr> <td style="padding:4px 0;"><b>In Words:</b> ${amountToWords(payment.amount)}</td> <td style="padding:4px 0;"><b>Amount:</b> <b style="font-size:16px;">${currency(payment.amount)}</b></td> </tr> </table> ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""} <div style="height:30px;"></div> <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;"> <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div> <div style="margin-right:10px;"><div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px; text-align:center;">Authorized Signature</div></div> </div> </div> `;
       }
       function renderReceiptHTML(org, payment, unit) { return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Receipt</title><style>@media print{@page{size:A4 portrait;margin:0.5mm}body{background:white!important}.sheet{height:60mm;max-width:200mm;margin-bottom:3mm;padding:8px;page-break-after:always;border:1px dotted #ccc}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;padding:0}</style></head><body><div class="sheet">${renderReceiptInner(org, payment, unit)}</div></body></html>`; }
 
