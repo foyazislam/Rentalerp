@@ -3,13 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
-    <title>Home/Shop RMS</title>
+    <title>Home/Shop RMS Pro</title>
     
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & DOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Firebase SDKs (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -28,6 +35,15 @@
             },
             padding: {
               'safe-bottom': 'env(safe-area-inset-bottom)',
+            },
+            animation: {
+                'slide-up': 'slideUp 0.3s ease-out forwards',
+            },
+            keyframes: {
+                slideUp: {
+                    '0%': { transform: 'translateY(100%)', opacity: '0' },
+                    '100%': { transform: 'translateY(0)', opacity: '1' },
+                }
             }
           }
         }
@@ -35,39 +51,37 @@
     </script>
 
     <style>
-      /* Base Styles & Transitions */
-      html, body { height: 100%; transition: background-color 0.3s ease, color 0.3s ease; overscroll-behavior-y: none; }
+      /* Base Styles */
+      html, body { height: 100%; transition: background-color 0.3s ease, color 0.3s ease; overscroll-behavior-y: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
       body { -webkit-tap-highlight-color: transparent; }
       
-      /* Theme Variables (Default Indigo) */
+      /* Theme Variables */
       :root {
         --theme-50: #eef2ff; --theme-100: #e0e7ff; --theme-200: #c7d2fe; --theme-300: #a5b4fc; --theme-400: #818cf8;
         --theme-500: #6366f1; --theme-600: #4f46e5; --theme-700: #4338ca; --theme-800: #3730a3; --theme-900: #312e81;
       }
 
-      /* Scrollbars */
-      .overflow-auto::-webkit-scrollbar { height: 4px; width: 4px; }
-      .overflow-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-      .dark .overflow-auto::-webkit-scrollbar-thumb { background: #475569; }
+      /* Custom Scrollbars */
+      .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
 
       /* Mobile Input Optimization */
-      input[type="date"], input[type="month"] {
-        -webkit-appearance: none; appearance: none;
-        background-color: #ffffff !important;
-        min-height: 44px; /* Taller touch target */
-      }
-      .dark input[type="date"], .dark input[type="month"] {
-        background-color: #1e293b !important; color: #ffffff !important; border-color: #334155 !important; color-scheme: dark;
-      }
+      input[type="date"], input[type="month"] { -webkit-appearance: none; appearance: none; background-color: transparent; min-height: 42px; }
+      
+      /* Print Hiding */
+      @media print { .no-print { display: none !important; } }
     </style>
   </head>
-  <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
+  <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 selection:bg-indigo-500 selection:text-white">
     <div id="root"></div>
 
     <script type="text/babel">
-      const { useEffect, useMemo, useRef, useState } = React;
+      const { useEffect, useMemo, useRef, useState, createContext, useContext } = React;
       
-      /* ------------- Firebase Setup ------------- */
+      /* ------------- Firebase Config ------------- */
+      // NOTE: Ensure your API Key is correct and allows the necessary domains
       const firebaseConfig = {
         apiKey: "AIzaSyBR20axEzJjcoNNyGxxxvc6AZYrxPBQ6M4",
         authDomain: "homeshop-rms.firebaseapp.com",
@@ -76,24 +90,53 @@
         messagingSenderId: "860746996508",
         appId: "1:860746996508:web:7a9360811037941725b8d9"
       };
+      
       if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
       const db = firebase.firestore();
       const auth = firebase.auth();
       const storage = firebase.storage();
+
+      /* ------------- Toast Context ------------- */
+      const ToastContext = createContext();
+      const useToast = () => useContext(ToastContext);
+
+      const ToastProvider = ({ children }) => {
+          const [toasts, setToasts] = useState([]);
+          
+          const addToast = (msg, type = 'success') => {
+              const id = Date.now();
+              setToasts(prev => [...prev, { id, msg, type }]);
+              setTimeout(() => removeToast(id), 3000);
+          };
+
+          const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
+
+          return (
+              <ToastContext.Provider value={{ addToast }}>
+                  {children}
+                  <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+                      {toasts.map(t => (
+                          <div key={t.id} className={`pointer-events-auto animate-slide-up px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-sm font-medium text-white ${t.type === 'error' ? 'bg-rose-600' : 'bg-emerald-600'}`}>
+                              <span>{t.type === 'error' ? '⚠️' : '✅'}</span> {t.msg}
+                          </div>
+                      ))}
+                  </div>
+              </ToastContext.Provider>
+          );
+      };
 
       /* ------------- Theme Definitions ------------- */
       const THEMES = {
         indigo: { name: 'Default', colors: { 50:'#eef2ff', 100:'#e0e7ff', 200:'#c7d2fe', 300:'#a5b4fc', 400:'#818cf8', 500:'#6366f1', 600:'#4f46e5', 700:'#4338ca', 800:'#3730a3', 900:'#312e81' }},
         blue: { name: 'Ocean', colors: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 800:'#1e40af', 900:'#1e3a8a' }},
         emerald: { name: 'Forest', colors: { 50:'#ecfdf5', 100:'#d1fae5', 200:'#a7f3d0', 300:'#6ee7b7', 400:'#34d399', 500:'#10b981', 600:'#059669', 700:'#047857', 800:'#065f46', 900:'#064e3b' }},
-        orange: { name: 'Sunset', colors: { 50:'#fff7ed', 100:'#ffedd5', 200:'#fed7aa', 300:'#fdba74', 400:'#fb923c', 500:'#f97316', 600:'#ea580c', 700:'#c2410c', 800:'#9a3412', 900:'#7c2d12' }},
-        rose: { name: 'Rose', colors: { 50:'#fff1f2', 100:'#ffe4e6', 200:'#fecdd3', 300:'#fda4af', 400:'#fb7185', 500:'#f43f5e', 600:'#e11d48', 700:'#be123c', 800:'#9f1239', 900:'#881337' }},
-        violet: { name: 'Royal', colors: { 50:'#f5f3ff', 100:'#ede9fe', 200:'#ddd6fe', 300:'#c4b5fd', 400:'#a78bfa', 500:'#8b5cf6', 600:'#7c3aed', 700:'#6d28d9', 800:'#5b21b6', 900:'#4c1d95' }},
+        slate: { name: 'Graphite', colors: { 50:'#f8fafc', 100:'#f1f5f9', 200:'#e2e8f0', 300:'#cbd5e1', 400:'#94a3b8', 500:'#64748b', 600:'#475569', 700:'#334155', 800:'#1e293b', 900:'#0f172a' }},
       };
 
       /* ------------- Utilities ------------- */
       const todayStr = () => new Date().toISOString().slice(0, 10);
       const formatDisplayDate = (dateStr) => { if (!dateStr) return ""; const [y, m, d] = dateStr.split('-'); return `${d}-${m}-${y}`; };
+      // Old receipt logic preferred "Taka Only"
       const currency = (n) => { const num = Number(n || 0); try { return num.toLocaleString(undefined, { style: "currency", currency: "BDT" }).replace("BDT", "৳").trim(); } catch { return `৳${num.toLocaleString()}`; } };
       const formatMonth = (ym) => { if (!ym || ym.length !== 7) return "N/A"; const [year, month] = ym.split('-'); const date = new Date(year, month - 1, 1); return date.toLocaleString('default', { month: 'long', year: 'numeric' }); };
       
@@ -128,39 +171,70 @@
 
       const monthKey = (dateStr) => { const d = new Date(dateStr); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
       const nextReceiptNo = (allPayments) => { const yyyymm = monthKey(new Date().toISOString()); const prefix = `RC-${yyyymm}-`; const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1; return `${prefix}${String(count).padStart(4, "0")}`; };
-      const download = (text) => { const filename = "rental-erp-backup.json"; const blob = new Blob([text], { type: "application/json;charset=utf-8;" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); };
+      
+      const exportToCSV = (data, filename) => {
+          const csvContent = "data:text/csv;charset=utf-8," + data.map(e => e.join(",")).join("\n");
+          const encodedUri = encodeURI(csvContent);
+          const link = document.createElement("a");
+          link.setAttribute("href", encodedUri);
+          link.setAttribute("download", filename);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+      };
+
+      // Receipt Helpers
+      function escapeHTML(str) { return String(str || "").replace(/[&<>'"/]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;","/":"&#x2F;"}[c] || c)); }
+      function renderReceiptInner(org, payment, unit) { 
+          const unitName = unit?.name || payment.unitId || "N/A"; 
+          const formattedMonth = formatMonth(payment.forMonth); 
+          const displayDate = formatDisplayDate(payment.date); 
+          const displayPurpose = (payment.purpose === "Rent" || !payment.purpose) ? "Rent And Service Charge" : payment.purpose;
+          return ` <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 20px; background: white; border: 1px solid #ddd;"> <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;"> <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1> <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)}</p> </div> <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2> <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;"> <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span> <span><b>Date:</b> ${escapeHTML(displayDate)}</span> </div> <table style="width:100%; font-size:14px; border-collapse: collapse;"> <tr><td style="padding:4px 0;"><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td></tr> <tr> <td style="padding:4px 0;"><b>For Unit No:</b> ${escapeHTML(unitName)}</td> <td style="padding:4px 0;"><b>Purpose:</b> ${escapeHTML(displayPurpose)}</td> </tr> <tr> <td style="padding:4px 0;"><b>For The Month:</b> ${escapeHTML(formattedMonth)}</td> <td style="padding:4px 0;"><b>Method:</b> ${escapeHTML(payment.method)}</td> </tr> <tr> <td style="padding:4px 0;"><b>In Words:</b> ${amountToWords(payment.amount)}</td> <td style="padding:4px 0;"><b>Amount:</b> <b style="font-size:16px;">${currency(payment.amount)}</b></td> </tr> </table> ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""} <div style="height:30px;"></div> <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;"> <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div> <div style="margin-right:10px;"><div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px; text-align:center;">Authorized Signature</div></div> </div> </div> `;
+      }
+      function renderReceiptHTML(org, payment, unit) { return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Receipt</title><style>@media print{@page{size:A4 portrait;margin:0}body{margin:0!important}.sheet{height:98mm;width:100%;padding:5mm;box-sizing:border-box;page-break-inside:avoid;border-bottom:1px dashed #ccc}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;padding:10px;max-width:210mm;}</style></head><body><div class="sheet">${renderReceiptInner(org, payment, unit)}</div></body></html>`; }
+
       const classNames = (...c) => c.filter(Boolean).join(" ");
       if (!(window.crypto && window.crypto.randomUUID)) { window.crypto = window.crypto || {}; window.crypto.randomUUID = function () { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { const r = (Math.random() * 16) | 0; const v = c === 'x' ? r : (r & 0x3) | 0x8; return v.toString(16); }); }; }
       
-      const shouldShowReminder = (dueDay) => { const today = new Date(); const currentDay = today.getDate(); return Math.abs(currentDay - Number(dueDay)) === 2; }
-      const createWhatsAppLink = (tenantPhone, unitName, orgName, dueDay, rentAmount) => { if (!tenantPhone || !unitName) return null; const phone = tenantPhone.replace(/\D/g, ''); const rent = currency(rentAmount); const message = `*Rent Reminder from ${orgName}*\n\nDear tenant of ${unitName},\n\nThis is a friendly reminder that your monthly rent of ${rent} is due in 2 days (on the ${dueDay}th of the month).\n\nPlease make the payment before the due date.\nThank you!`; return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`; };
+      const shouldShowReminder = (dueDay) => { const today = new Date(); return Math.abs(today.getDate() - Number(dueDay)) <= 2; }
+      const createWhatsAppLink = (phone, unitName, orgName, dueDay, rent) => { if (!phone) return null; const p = phone.replace(/\D/g, ''); const msg = `*Rent Reminder from ${orgName}*\n\nDear tenant of ${unitName},\n\nYour rent of ${currency(rent)} is due by date ${dueDay}.\nPlease pay on time.\nThank you!`; return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`; };
 
       /* ------------- Initial Data ------------- */
       const initialData = {
-        org: { name: "Shahjahan chowdhury Bari", address: "House: 383, Road: 13, Block: J, Bashundhara R/A, Dhaka-1230", phone: "+8801749333661", email: "Foyaz.islam@yahoo.com", note: "Thank you for your payment!", },
+        org: { name: "Shahjahan Chowdhury Bari", address: "Bashundhara R/A, Dhaka-1230", phone: "+8801749333661", email: "info@example.com", note: "Thank you for your payment!", },
         settings: { theme: 'indigo', darkMode: false },
-        units: [ ...Array.from({ length: 10 }).map((_, i) => ({ id: `F${i + 1}`, type: "Flat", name: `Flat ${i + 1}`, floor: Math.ceil((i + 1) / 2), rent: 15000, dueDay: 5, tenant: "", tenantPhone: "", tenantPhotoUrl: "", tenantNidUrl: "", rentAgreementUrl: "", enableReminder: true, })), ...Array.from({ length: 5 }).map((_, i) => ({ id: `S${i + 1}`, type: "Shop", name: `Shop ${i + 1}`, floor: 0, rent: 25000, dueDay: 5, tenant: "", tenantPhone: "", tenantPhotoUrl: "", tenantNidUrl: "", rentAgreementUrl: "", enableReminder: true, })), ],
+        units: [ ...Array.from({ length: 5 }).map((_, i) => ({ id: `F${i + 1}`, type: "Flat", name: `Flat ${i + 1}`, rent: 15000, dueDay: 5, tenant: "", tenantPhone: "", enableReminder: true })), ],
         payments: [], expenses: []
       };
 
       /* ------------- Cloud Storage ------------- */
-      const localStorageKey = "rental_erp_v1";
-      const loadData = async (uid = "TEST_USER_ID") => { try { const rawLocal = localStorage.getItem(localStorageKey); if (rawLocal) { const parsed = JSON.parse(rawLocal); await saveData(parsed, uid); localStorage.removeItem(localStorageKey); alert("Local data migrated to the cloud successfully!"); return { ...initialData, ...parsed }; } const docPath = `erp_data/${uid}`; const docRef = db.doc(docPath); const doc = await docRef.get(); if (doc.exists) return { ...initialData, ...doc.data() }; await saveData(initialData, uid); return initialData; } catch (e) { console.error("Cloud Load error", e); return initialData; } };
-      const saveData = async (data, uid = "TEST_USER_ID") => { if (!uid) return; try { const docPath = `erp_data/${uid}`; await db.doc(docPath).set({ org: data.org, settings: data.settings || { theme: 'indigo', darkMode: false }, units: data.units, payments: data.payments, expenses: data.expenses, }); } catch (e) { console.error("Cloud Save error", e); alert("Warning: Data failed to save to the cloud."); } };
+      const loadData = async (uid) => { 
+        try { 
+            const doc = await db.doc(`erp_data/${uid}`).get(); 
+            if (doc.exists) {
+                const saved = doc.data();
+                return { ...initialData, ...saved };
+            }
+            return initialData; 
+        } catch (e) { console.error(e); return initialData; } 
+      };
+      const saveData = async (data, uid) => { 
+        if (!uid) return; 
+        try { await db.doc(`erp_data/${uid}`).set({ ...data }); } catch (e) { console.error(e); } 
+      };
       
       const uploadFile = async (file, unitId, type) => { 
           const user = auth.currentUser;
-          if (!user) { alert("You must be logged in to upload files."); return null; }
-          const storageRef = storage.ref();
-          const path = `tenant_docs/${user.uid}/${unitId}/${type}/${file.name}`;
-          const snapshot = await storageRef.child(path).put(file); 
-          return await snapshot.ref.getDownloadURL(); 
+          if (!user) throw new Error("Login required");
+          const ref = storage.ref(`tenant_docs/${user.uid}/${unitId}/${type}/${file.name}`);
+          await ref.put(file); return await ref.getDownloadURL(); 
       };
 
-      /* ------------- Mobile-Optimized Components ------------- */
-      const Section = ({ title, right, children }) => (
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 transition-all duration-200 hover:shadow-md">
-          <div className="flex flex-wrap items-center justify-between mb-4 gap-2">
+      /* ------------- Components ------------- */
+      const Section = ({ title, right, children, className }) => (
+        <div className={classNames("bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 transition-all", className)}>
+          <div className="flex flex-wrap items-center justify-between mb-4 gap-2 border-b border-slate-100 dark:border-slate-700 pb-2">
             <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100">{title}</h2>
             {right}
           </div>
@@ -168,74 +242,92 @@
         </div>
       );
 
-      const Input = (props) => {
-        return (
-          <input
-            {...props}
-            min={props.type === 'number' ? "0" : undefined}
-            className={classNames(
-              "w-full rounded-lg border px-3 py-3 text-base shadow-sm transition-colors",
-              "border-slate-300 bg-white text-slate-700 placeholder:text-slate-400",
-              "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500",
-              "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",
-              "disabled:bg-slate-50 dark:disabled:bg-slate-900 disabled:text-slate-500",
-              props.className
-            )}
-          />
-        );
-      };
+      const Input = (props) => (
+          <input {...props} className={classNames("w-full rounded-lg border px-3 py-2.5 text-sm shadow-sm transition-colors border-slate-300 bg-white text-slate-700 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-900/50 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-60", props.className)} />
+      );
 
-      const Select = (props) => {
-        return (
+      const Select = (props) => (
           <div className="relative w-full">
-            <select
-              {...props}
-              className={classNames(
-                "w-full rounded-lg border px-3 py-3 text-base shadow-sm appearance-none transition-colors",
-                "border-slate-300 bg-white text-slate-700",
-                "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100",
-                "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",
-                props.className
-              )}
-            />
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-              <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
-            </div>
+            <select {...props} className={classNames("w-full rounded-lg border px-3 py-2.5 text-sm shadow-sm appearance-none transition-colors border-slate-300 bg-white text-slate-700 dark:border-slate-600 dark:bg-slate-900/50 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500", props.className)} />
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500"><svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg></div>
           </div>
-        );
-      };
+      );
 
-      const Button = ({ children, variant = "primary", className, ...rest }) => {
+      const Button = ({ children, variant = "primary", className, loading, ...rest }) => {
         const styles = {
-          primary: "bg-indigo-600 text-white active:bg-indigo-700 active:scale-95",
-          secondary: "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 active:bg-slate-50 active:scale-95",
-          danger: "bg-rose-600 text-white active:bg-rose-700 active:scale-95",
-          ghost: "bg-transparent active:bg-slate-100 dark:active:bg-slate-800 text-slate-600 dark:text-slate-300",
+          primary: "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-sm",
+          secondary: "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600",
+          danger: "bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-sm",
+          ghost: "bg-transparent hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300",
         };
         return (
-          <button
-            {...rest}
-            className={classNames(
-              "rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation select-none",
-              styles[variant],
-              className
-            )}
-          >
+          <button {...rest} disabled={rest.disabled || loading} className={classNames("rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2", styles[variant], className)}>
+            {loading && <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>}
             {children}
           </button>
         );
       };
       
-      const Checkbox = (props) => (
-          <div className="flex items-center py-2">
-              <input type="checkbox" {...props} className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-              {props.label && <label htmlFor={props.id} className="ml-3 text-sm text-slate-700 dark:text-slate-300 select-none">{props.label}</label>}
+      const Checkbox = ({ label, id, ...props }) => (
+          <div className="flex items-center py-2 cursor-pointer">
+              <input type="checkbox" id={id} {...props} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+              {label && <label htmlFor={id} className="ml-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer select-none">{label}</label>}
           </div>
       );
 
+      const ChartComponent = ({ data, type = 'bar', title }) => {
+        const canvasRef = useRef(null);
+        const chartRef = useRef(null);
+
+        useEffect(() => {
+            if (!canvasRef.current) return;
+            if (chartRef.current) chartRef.current.destroy();
+
+            const ctx = canvasRef.current.getContext('2d');
+            chartRef.current = new Chart(ctx, {
+                type: type,
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#475569' } },
+                        title: { display: !!title, text: title }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: document.documentElement.classList.contains('dark') ? '#334155' : '#e2e8f0' },
+                            ticks: { color: document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#475569' }
+                        },
+                        x: { 
+                            grid: { display: false },
+                            ticks: { color: document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#475569' }
+                        }
+                    }
+                }
+            });
+            return () => { if (chartRef.current) chartRef.current.destroy(); };
+        }, [data, type, title]);
+
+        return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
+      };
+
+      const Pagination = ({ totalItems, itemsPerPage, currentPage, setCurrentPage }) => {
+        const pages = Math.ceil(totalItems / itemsPerPage);
+        if (pages <= 1) return null;
+        return (
+          <div className="flex justify-end gap-2 mt-4 items-center">
+            <span className="text-xs text-slate-500 dark:text-slate-400 mr-2">Page {currentPage} of {pages}</span>
+            <Button variant="secondary" className="!py-1 !px-2" disabled={currentPage===1} onClick={()=>setCurrentPage(c=>Math.max(1,c-1))}>Prev</Button>
+            <Button variant="secondary" className="!py-1 !px-2" disabled={currentPage===pages} onClick={()=>setCurrentPage(c=>Math.min(pages,c+1))}>Next</Button>
+          </div>
+        )
+      };
+
       function FileUpload({ label, urlKey, unitId, setUnitForm, currentUrl }) {
           const [uploading, setUploading] = useState(false);
-          const fileInputRef = useRef(null);
+          const { addToast } = useToast();
           const handleFileChange = async (event) => {
               const file = event.target.files[0];
               if (!file) return;
@@ -244,24 +336,16 @@
                   const type = urlKey.replace('tenant', '').replace('Nid', 'NID').replace('Agreement', 'Agreement');
                   const url = await uploadFile(file, unitId, type);
                   setUnitForm(f => ({ ...f, [`${urlKey}Url`]: url }));
-                  alert(`${label} uploaded!`);
-              } catch (error) { alert(`Upload failed.`); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = null; }
+                  addToast(`${label} uploaded!`);
+              } catch (error) { addToast("Upload failed.", "error"); } finally { setUploading(false); }
           };
           return (
               <div className="space-y-1 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
-                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</label>
+                  <div className="flex justify-between items-center"><label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{label}</label> {currentUrl && <a href={currentUrl} target="_blank" className="text-xs text-indigo-600 hover:underline">View Current</a>}</div>
                   <div className="flex items-center gap-2">
-                      <input type="file" ref={fileInputRef} onChange={handleFileChange} disabled={uploading || !unitId} 
-                          className="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-2 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900 dark:file:text-indigo-200 hover:file:bg-indigo-100"
-                      />
-                      {currentUrl && (
-                          <a href={currentUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700" title="View Document">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" /></svg>
-                          </a>
-                      )}
+                      <input type="file" onChange={handleFileChange} disabled={uploading || !unitId} className="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200 dark:file:bg-indigo-900 dark:file:text-indigo-200" />
+                      {uploading && <div className="h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>}
                   </div>
-                  {!unitId && <p className="text-xs text-rose-500">Save unit to upload.</p>}
-                  {uploading && <p className="text-xs text-indigo-600 animate-pulse">Uploading...</p>}
               </div>
           );
       }
@@ -270,73 +354,142 @@
       function App({ currentUser }) {
         const [data, setData] = useState(initialData);
         const [tab, setTab] = useState("dashboard");
-        const [search, setSearch] = useState("");
         const [showReceipt, setShowReceipt] = useState(null);
         const [loading, setLoading] = useState(true);
-        const [deleteRequest, setDeleteRequest] = useState(null); 
+        const [deleteRequest, setDeleteRequest] = useState(null);
         const [showSettingsPrompt, setShowSettingsPrompt] = useState(false);
-        const uid = currentUser?.uid || "TEST_USER_ID";
+        const { addToast } = useToast();
+        const uid = currentUser?.uid;
         
+        // Theme Effect
         useEffect(() => {
             const settings = data.settings || { theme: 'indigo', darkMode: false };
             const themeKey = settings.theme || 'indigo';
             const themeColors = THEMES[themeKey]?.colors || THEMES.indigo.colors;
             const root = document.documentElement;
+            
             Object.entries(themeColors).forEach(([shade, value]) => { root.style.setProperty(`--theme-${shade}`, value); });
-            if (settings.darkMode) { root.classList.add('dark'); } else { root.classList.remove('dark'); }
+            if (settings.darkMode) root.classList.add('dark'); else root.classList.remove('dark');
         }, [data.settings]);
         
-        const updateSettings = (patch) => { setData(d => ({ ...d, settings: { ...(d.settings || {}), ...patch } })); };
-        const isPasswordCorrect = async (password) => { if (!currentUser?.email) return false; try { await auth.signInWithEmailAndPassword(currentUser.email, password); return true; } catch { return false; } };
-        const deletePayment = (id) => { setData((d) => ({ ...d, payments: d.payments.filter((p) => p.id !== id) })); setDeleteRequest(null); alert("Payment deleted."); };
-        const deleteExpense = (id) => { setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) })); setDeleteRequest(null); alert("Expense deleted."); };
+        // Cloud Sync
+        useEffect(() => { 
+            if (!uid) return;
+            setLoading(true); 
+            loadData(uid).then(init => { setData(init); setLoading(false); }); 
+        }, [uid]);
+        
+        // Auto Save Debounce
+        useEffect(() => { 
+            if (loading || !uid) return; 
+            const timer = setTimeout(() => saveData(data, uid), 800); 
+            return () => clearTimeout(timer); 
+        }, [data, loading, uid]);
+        
+        const updateOrg = (patch) => setData(d => ({ ...d, org: { ...d.org, ...patch } }));
+        const updateSettings = (patch) => setData(d => ({ ...d, settings: { ...d.settings, ...patch } }));
+        const upsertUnit = (unit) => {
+            setData(d => ({ ...d, units: d.units.some(x => x.id === unit.id) ? d.units.map(x => x.id === unit.id ? { ...x, ...unit } : x) : [...d.units, unit] }));
+            addToast("Unit saved successfully");
+        };
+        const deleteUnit = (id) => { 
+            if(!confirm("Delete this unit?")) return;
+            setData(d => ({ ...d, units: d.units.filter(u => u.id !== id) })); 
+            addToast("Unit deleted");
+        };
 
-        useEffect(() => { setLoading(true); loadData(uid).then(init => { setData(init); setLoading(false); }); }, [uid]);
-        const saveTimeout = useRef(null);
-        useEffect(() => { if (loading || !uid) return; if (saveTimeout.current) clearTimeout(saveTimeout.current); saveTimeout.current = setTimeout(() => { saveData(data, uid); }, 500); return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); }; }, [data, loading, uid]);
-        
-        const units = data.units; const payments = data.payments; const expenses = data.expenses; const org = data.org;
-        const totals = useMemo(() => { const income = payments.reduce((s, p) => s + Number(p.amount || 0), 0); const expense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0); return { income, expense, net: income - expense }; }, [payments, expenses]);
-        const outstandingByUnit = useMemo(() => { const now = new Date(); const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; const map = Object.fromEntries(units.map((u) => [u.id, u.rent || 0])); payments.filter((p) => (p.forMonth || "").startsWith(ym)).forEach((p) => { map[p.unitId] = (map[p.unitId] || 0) - Number(p.amount || 0); }); return map; }, [units, payments]);
-        const filteredUnits = useMemo(() => { if (!search) return units; const q = search.toLowerCase(); return units.filter((u) => u.id.toLowerCase().includes(q) || u.name.toLowerCase().includes(q) || (u.tenant || "").toLowerCase().includes(q)); }, [units, search]);
-        const unitsForReminder = useMemo(() => { if (!org.name) return []; const now = new Date(); const currentMonthKey = monthKey(now.toISOString()); const paidForCurrentMonth = payments.filter(p => (p.forMonth || "").startsWith(currentMonthKey)).reduce((acc, p) => { acc[p.unitId] = (acc[p.unitId] || 0) + Number(p.amount || 0); return acc; }, {}); return units.filter(u => { if (!u.enableReminder || !u.tenantPhone || !u.rent) return false; if (!shouldShowReminder(u.dueDay)) return false; return (paidForCurrentMonth[u.id] || 0) < (u.rent || 0); }).map(u => ({ ...u, whatsappLink: createWhatsAppLink(u.tenantPhone, u.name, org.name, u.dueDay, u.rent) })); }, [units, org, payments]);
-        
-        const updateOrg = (patch) => setData((d) => ({ ...d, org: { ...d.org, ...patch } }));
-        const upsertUnit = (unit) => setData((d) => ({ ...d, units: d.units.some((x) => x.id === unit.id) ? d.units.map((x) => (x.id === unit.id ? { ...x, ...unit } : x)) : [...d.units, unit] }));
-        const deleteUnit = (id) => setData((d) => ({ ...d, units: d.units.filter((u) => u.id !== id) }));
-        const addPayment = (p) => setData((d) => ({ ...d, payments: [{ ...p, id: crypto.randomUUID() }, ...d.payments] }));
-        const addExpense = (e) => setData((d) => ({ ...d, expenses: [{ ...e, id: crypto.randomUUID() }, ...d.expenses] }));
-        const exportData = () => download(JSON.stringify(data, null, 2));
-        const importData = (file) => { const reader = new FileReader(); reader.onload = (evt) => { try { setData(JSON.parse(evt.target.result)); alert("Import successful ✅"); } catch { alert("Import failed: invalid JSON"); } }; reader.readAsText(file); };
-        const clearOrgFields = () => setData((d) => ({ ...d, org: { name: "", address: "", phone: "", email: "", note: "" } }));
-        const restoreDemoOrg = () => setData((d) => ({ ...d, org: { ...initialData.org } }));
-        const clearPayments = () => setData((d) => ({ ...d, payments: [] }));
-        const clearExpenses = () => setData((d) => ({ ...d, expenses: [] }));
-        const factoryReset = () => { setData({ ...initialData }); };
-        const handleSignOut = async () => { try { await auth.signOut(); } catch { alert("Failed to sign out."); } };
-        
+        const isPasswordCorrect = async (password) => { 
+            if (!currentUser?.email) return false; 
+            try { await auth.signInWithEmailAndPassword(currentUser.email, password); return true; } catch { return false; } 
+        };
+
+        const deletePayment = (id) => {
+            setData((d) => ({ ...d, payments: d.payments.filter((p) => p.id !== id) })); 
+            setDeleteRequest(null); 
+            addToast("Payment deleted", "error"); 
+        };
+        const deleteExpense = (id) => { 
+            setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) })); 
+            setDeleteRequest(null); 
+            addToast("Expense deleted", "error"); 
+        };
+
+        const addPayment = (p) => {
+            setData(d => ({ ...d, payments: [{ ...p, id: crypto.randomUUID() }, ...d.payments] }));
+            addToast(`Receipt ${p.receiptNo} created`);
+        };
+        const addExpense = (e) => {
+            setData(d => ({ ...d, expenses: [{ ...e, id: crypto.randomUUID() }, ...d.expenses] }));
+            addToast("Expense recorded");
+        };
+
+        const totals = useMemo(() => {
+            const income = data.payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+            const expense = data.expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+            return { income, expense, net: income - expense };
+        }, [data.payments, data.expenses]);
+
+        const chartData = useMemo(() => {
+            // Last 6 months data for chart
+            const labels = [];
+            const incomeData = [];
+            const expenseData = [];
+            
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date();
+                d.setMonth(d.getMonth() - i);
+                const key = monthKey(d.toISOString());
+                const label = d.toLocaleString('default', { month: 'short' });
+                labels.push(label);
+                
+                const inc = data.payments.filter(p => (p.date || "").startsWith(key)).reduce((s, p) => s + Number(p.amount || 0), 0);
+                const exp = data.expenses.filter(e => (e.date || "").startsWith(key)).reduce((s, e) => s + Number(e.amount || 0), 0);
+                incomeData.push(inc);
+                expenseData.push(exp);
+            }
+            return {
+                labels,
+                datasets: [
+                    { label: 'Income', data: incomeData, backgroundColor: '#4f46e5', borderRadius: 4 },
+                    { label: 'Expense', data: expenseData, backgroundColor: '#e11d48', borderRadius: 4 }
+                ]
+            };
+        }, [data.payments, data.expenses]);
+
+        const outstandingMap = useMemo(() => {
+            const now = new Date();
+            const ym = monthKey(now.toISOString());
+            const map = {};
+            data.units.forEach(u => map[u.id] = u.rent || 0);
+            data.payments.filter(p => (p.forMonth || "").startsWith(ym)).forEach(p => { map[p.unitId] = Math.max(0, (map[p.unitId] || 0) - Number(p.amount || 0)); });
+            return map;
+        }, [data.units, data.payments]);
+
+        if (loading) return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 gap-4">
+                <div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="text-slate-500 animate-pulse">Loading your data...</div>
+            </div>
+        );
+
         return (
           <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 pb-safe-bottom transition-colors duration-300">
-            {loading && <div className="fixed inset-0 bg-white/80 dark:bg-slate-900/80 z-50 flex items-center justify-center backdrop-blur-sm"><div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>}
-            
-            <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300">
+            <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 shadow-sm no-print">
               <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-sm"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></div>
-                    <div className="font-bold text-lg md:text-xl text-slate-800 dark:text-white truncate max-w-[200px] md:max-w-md">{data.org.name || "RMS"}</div>
+                <div className="flex items-center gap-2.5">
+                    <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-sm"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></div>
+                    <div className="font-bold text-lg md:text-xl truncate">{data.org.name || "RMS Pro"}</div>
                 </div>
-                {currentUser && (
-                    <div className="flex items-center">
-                        <span className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mr-2 hidden sm:inline-block">User: {currentUser.email}</span>
-                        <Button variant="secondary" onClick={handleSignOut} className="text-xs">Sign Out</Button>
-                    </div>
-                )}
+                <div className="flex items-center gap-2">
+                    <span className="hidden sm:inline text-xs text-slate-500 dark:text-slate-400">{currentUser.email}</span>
+                    <Button variant="ghost" onClick={() => auth.signOut()} className="text-xs !px-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg></Button>
+                </div>
               </div>
-              <nav className="mx-auto max-w-6xl px-4 pb-0 overflow-x-auto no-scrollbar">
-                <div className="flex gap-2 min-w-max pb-3">
-                   {[ ["dashboard", "Dashboard"], ["units", "Units"], ["payments", "Payments"], ["newReceipt", "+ Receipt"], ["statement", "Statement"], ["expenses", "Expenses"], ["settings", "Settings"], ].map(([key, label]) => (
+              <nav className="mx-auto max-w-6xl px-4 overflow-x-auto custom-scrollbar">
+                <div className="flex gap-1 pb-2 min-w-max">
+                   {[ ["dashboard", "Dashboard"], ["units", "Units"], ["payments", "History"], ["newReceipt", "+ Receipt"], ["statement", "Statement"], ["expenses", "Expenses"], ["settings", "Settings"] ].map(([key, label]) => (
                     <button key={key} onClick={() => { if (key === 'settings' && currentUser) setShowSettingsPrompt(true); else setTab(key); }}
-                      className={classNames("px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap active:scale-95", tab === key ? "bg-indigo-600 text-white shadow-md" : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 bg-slate-100/50 dark:bg-slate-800")}>
+                      className={classNames("px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap", tab === key ? "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300" : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700")}>
                       {label}
                     </button>
                   ))}
@@ -344,23 +497,506 @@
               </nav>
             </header>
 
-            <main className="mx-auto max-w-6xl p-4 space-y-6 pb-24 md:pb-12">
-              {tab === "dashboard" && <DashboardSection totals={totals} units={units} outstandingByUnit={outstandingByUnit} unitsForReminder={unitsForReminder} setTab={setTab} />}
-              {tab === "units" && <Section title="Manage Units" right={<Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-48" />}><UnitsTable units={filteredUnits} upsertUnit={upsertUnit} deleteUnit={deleteUnit} /></Section>}
-              {tab === "payments" && <Section title="Transaction History"><PaymentsTable payments={payments} units={units} onRowClick={setShowReceipt} onDelete={(id) => setDeleteRequest({ type: 'payment', id })} /></Section>}
-              {tab === "newReceipt" && <Section title="New Money Receipt"><NewReceiptForm units={units} addPayment={addPayment} data={data} /></Section>}
-              {tab === "statement" && <Section title="Financial Statement"><DateRangeStatement payments={payments} expenses={expenses} org={data.org} /></Section>}
-              {tab === "expenses" && <Section title="Expense Tracker"><ExpensesSection expenses={expenses} addExpense={addExpense} onDeleteExpense={(id) => setDeleteRequest({ type: 'expense', id })} /></Section>}
-              {tab === "settings" && <Section title="System Settings"><OrgSettings org={data.org} settings={data.settings} updateOrg={updateOrg} updateSettings={updateSettings} clearOrgFields={clearOrgFields} restoreDemoOrg={restoreDemoOrg} clearPayments={() => { if (confirm("Clear ALL payments?")) clearPayments(); }} clearExpenses={() => { if (confirm("Clear ALL expenses?")) clearExpenses(); }} factoryReset={() => { if (confirm("Factory Reset?")) factoryReset(); }} exportData={exportData} importData={importData} /></Section>}
-              {showReceipt && <ReceiptModal org={data.org} payment={showReceipt} unit={units.find((u) => u.id === showReceipt.unitId)} onClose={() => setShowReceipt(null)} />}
+            <main className="mx-auto max-w-6xl p-4 space-y-6 pb-24 md:pb-12 no-print">
+              {tab === "dashboard" && <Dashboard totals={totals} units={data.units} outstanding={outstandingMap} chartData={chartData} />}
+              {tab === "units" && <UnitsSection units={data.units} upsertUnit={upsertUnit} deleteUnit={deleteUnit} />}
+              {tab === "payments" && <PaymentsSection payments={data.payments} units={data.units} onRowClick={setShowReceipt} onDelete={(id) => setDeleteRequest({ type: 'payment', id })} />}
+              {tab === "newReceipt" && <NewReceiptSection units={data.units} addPayment={addPayment} data={data} />}
+              {tab === "statement" && <Section title="Financial Statement"><StatementView payments={data.payments} expenses={data.expenses} org={data.org} /></Section>}
+              {tab === "expenses" && <ExpensesSection expenses={data.expenses} addExpense={addExpense} onDelete={(id) => setDeleteRequest({ type: 'expense', id })} />}
+              {tab === "settings" && <SettingsSection org={data.org} settings={data.settings} updateOrg={updateOrg} updateSettings={updateSettings} data={data} setData={setData} />}
             </main>
 
+            {showReceipt && <ReceiptModal org={data.org} payment={showReceipt} unit={data.units.find(u => u.id === showReceipt.unitId)} onClose={() => setShowReceipt(null)} />}
             {(showSettingsPrompt || deleteRequest) && <PasswordPromptModal currentUser={currentUser} isPasswordCorrect={isPasswordCorrect} onClose={() => { setShowSettingsPrompt(false); setDeleteRequest(null); }} onSuccess={() => { if (showSettingsPrompt) { setTab('settings'); setShowSettingsPrompt(false); } else if (deleteRequest) { if (deleteRequest.type === 'payment') deletePayment(deleteRequest.id); else if (deleteRequest.type === 'expense') deleteExpense(deleteRequest.id); } }} actionLabel={showSettingsPrompt ? "Access Settings" : "Delete Record"} />}
           </div>
         );
       }
 
-      /* ------------- Modal Components ------------- */
+      /* ------------- Sub-Sections ------------- */
+      function Dashboard({ totals, units, outstanding, chartData }) {
+          const dueCount = Object.values(outstanding).filter(v => v > 0).length;
+          const totalDue = Object.values(outstanding).reduce((a,b) => a+b, 0);
+          
+          return (
+              <div className="space-y-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <StatCard label="Total Income" value={currency(totals.income)} icon="💰" color="text-emerald-600" />
+                      <StatCard label="Total Expense" value={currency(totals.expense)} icon="📉" color="text-rose-600" />
+                      <StatCard label="Net Profit" value={currency(totals.net)} icon="🏦" color="text-indigo-600" />
+                      <StatCard label="Rent Due" value={currency(totalDue)} icon="⚠️" color="text-orange-500" sub={`${dueCount} units`} />
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                          <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4">Financial Trends (6 Months)</h3>
+                          <ChartComponent data={chartData} />
+                      </div>
+                      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-y-auto max-h-80 custom-scrollbar">
+                          <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 sticky top-0 bg-white dark:bg-slate-800">Outstanding Dues</h3>
+                          <div className="space-y-2">
+                              {units.map(u => {
+                                  const due = outstanding[u.id];
+                                  if (due <= 0) return null;
+                                  return (
+                                      <div key={u.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                                          <div>
+                                              <div className="font-medium text-sm">{u.name}</div>
+                                              <div className="text-xs text-slate-500">{u.tenant || "Vacant"}</div>
+                                          </div>
+                                          <div className="text-rose-600 font-bold text-sm">{currency(due)}</div>
+                                      </div>
+                                  );
+                              })}
+                              {totalDue === 0 && <div className="text-center text-slate-400 py-8">No dues pending! 🎉</div>}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          );
+      }
+
+      function UnitsSection({ units, upsertUnit, deleteUnit }) {
+          const [form, setForm] = useState({});
+          const [search, setSearch] = useState("");
+          
+          const filtered = units.filter(u => u.name.toLowerCase().includes(search.toLowerCase()) || (u.tenant||"").toLowerCase().includes(search.toLowerCase()));
+          
+          return (
+              <div className="grid lg:grid-cols-3 gap-6">
+                  <Section title={form.id ? "Edit Unit" : "Add Unit"} className="h-fit">
+                      <div className="space-y-3">
+                          <div className="grid grid-cols-3 gap-2">
+                              <Input placeholder="ID (e.g. A1)" value={form.id||""} onChange={e => setForm({...form, id: e.target.value})} disabled={!!form.rent} className="col-span-1" />
+                              <Select value={form.type||"Flat"} onChange={e => setForm({...form, type: e.target.value})} className="col-span-2"><option>Flat</option><option>Shop</option></Select>
+                          </div>
+                          <Input placeholder="Unit Name" value={form.name||""} onChange={e => setForm({...form, name: e.target.value})} />
+                          <div className="grid grid-cols-2 gap-2">
+                              <Input type="number" placeholder="Rent" value={form.rent||""} onChange={e => setForm({...form, rent: e.target.value})} />
+                              <Input type="number" placeholder="Due Day" value={form.dueDay||""} onChange={e => setForm({...form, dueDay: e.target.value})} />
+                          </div>
+                          <hr className="border-slate-100 dark:border-slate-700" />
+                          <Input placeholder="Tenant Name" value={form.tenant||""} onChange={e => setForm({...form, tenant: e.target.value})} />
+                          <Input placeholder="Tenant Phone" value={form.tenantPhone||""} onChange={e => setForm({...form, tenantPhone: e.target.value})} />
+                          <Checkbox id="remind" label="WhatsApp Reminder" checked={!!form.enableReminder} onChange={e => setForm({...form, enableReminder: e.target.checked})} />
+                          
+                          {form.id && (
+                              <div className="grid grid-cols-3 gap-2 mt-2">
+                                  <FileUpload label="Photo" urlKey="tenantPhoto" unitId={form.id} setUnitForm={setForm} currentUrl={form.tenantPhotoUrl} />
+                                  <FileUpload label="NID" urlKey="tenantNid" unitId={form.id} setUnitForm={setForm} currentUrl={form.tenantNidUrl} />
+                                  <FileUpload label="Deed" urlKey="rentAgreement" unitId={form.id} setUnitForm={setForm} currentUrl={form.rentAgreementUrl} />
+                              </div>
+                          )}
+
+                          <div className="flex gap-2 pt-2">
+                              <Button className="flex-1" onClick={() => { if(!form.id) return; upsertUnit(form); setForm({}); }}>Save</Button>
+                              <Button variant="secondary" onClick={() => setForm({})}>Cancel</Button>
+                              {form.id && <Button variant="danger" onClick={() => { deleteUnit(form.id); setForm({}); }}>Del</Button>}
+                          </div>
+                      </div>
+                  </Section>
+                  
+                  <Section title="Unit List" right={<Input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="w-40" />} className="lg:col-span-2">
+                      <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm">
+                              <thead className="bg-slate-50 dark:bg-slate-700/50 text-left text-slate-500">
+                                  <tr><th className="p-3 rounded-l-lg">Unit</th><th className="p-3">Tenant</th><th className="p-3 text-right">Rent</th><th className="p-3 rounded-r-lg w-10"></th></tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                  {filtered.map(u => (
+                                      <tr key={u.id} className="group hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                                          <td className="p-3 font-medium">{u.name} <div className="text-xs text-slate-400">{u.type}</div></td>
+                                          <td className="p-3">{u.tenant ? <div>{u.tenant}<div className="text-xs text-slate-400">{u.tenantPhone}</div></div> : <span className="text-slate-400 text-xs italic">Vacant</span>}</td>
+                                          <td className="p-3 text-right font-mono">{currency(u.rent)}</td>
+                                          <td className="p-3"><Button variant="ghost" className="!p-1" onClick={() => setForm(u)}>✎</Button></td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </Section>
+              </div>
+          );
+      }
+
+      function PaymentsSection({ payments, units, onRowClick, onDelete }) {
+          const [search, setSearch] = useState("");
+          const [monthFilter, setMonthFilter] = useState("");
+          const [currentPage, setCurrentPage] = useState(1);
+          const itemsPerPage = 10;
+          
+          const filtered = useMemo(() => {
+              let res = payments;
+              if (monthFilter) res = res.filter(p => (p.forMonth || "").startsWith(monthFilter));
+              if (search) {
+                  const q = search.toLowerCase();
+                  res = res.filter(p => p.receiptNo.toLowerCase().includes(q) || p.tenant.toLowerCase().includes(q));
+              }
+              return res.sort((a,b) => new Date(b.date) - new Date(a.date));
+          }, [payments, search, monthFilter]);
+
+          const paginated = useMemo(() => {
+              const start = (currentPage - 1) * itemsPerPage;
+              return filtered.slice(start, start + itemsPerPage);
+          }, [filtered, currentPage]);
+
+          useEffect(() => setCurrentPage(1), [search, monthFilter]);
+
+          const exportCsv = () => {
+              const header = ["Date", "Receipt No", "Unit", "Tenant", "Month", "Amount", "Method"];
+              const rows = filtered.map(p => [p.date, p.receiptNo, p.unitId, p.tenant, p.forMonth, p.amount, p.method]);
+              exportToCSV([header, ...rows], `payments_${todayStr()}.csv`);
+          };
+
+          return (
+              <Section title="Transaction History" right={
+                  <div className="flex gap-2">
+                      <Input type="month" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} className="w-auto" />
+                      <Button variant="secondary" onClick={exportCsv} title="Export CSV">⬇ CSV</Button>
+                  </div>
+              }>
+                  <div className="mb-4"><Input placeholder="Search receipt number or tenant name..." value={search} onChange={e => setSearch(e.target.value)} /></div>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                      <table className="min-w-full text-sm">
+                          <thead className="bg-slate-50 dark:bg-slate-700/50 text-left text-slate-500">
+                              <tr><th className="p-3 w-10 text-center">S.N.</th><th className="p-3">Date</th><th className="p-3">Receipt</th><th className="p-3">Details</th><th className="p-3 text-right">Amount</th><th className="p-3 text-center">Action</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                              {paginated.map((p, i) => (
+                                  <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                                      <td className="p-3 text-center text-xs text-slate-400">{(currentPage - 1) * itemsPerPage + i + 1}</td>
+                                      <td className="p-3 whitespace-nowrap text-slate-500">{formatDisplayDate(p.date)}</td>
+                                      <td className="p-3 font-mono text-xs">{p.receiptNo}</td>
+                                      <td className="p-3">
+                                          <div className="font-medium">{p.tenant}</div>
+                                          <div className="text-xs text-slate-400">{units.find(u => u.id === p.unitId)?.name} • {formatMonth(p.forMonth)}</div>
+                                      </td>
+                                      <td className="p-3 text-right font-medium text-emerald-600">{currency(p.amount)}</td>
+                                      <td className="p-3 flex justify-center gap-2">
+                                          <button onClick={() => onRowClick(p)} className="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded">Print</button>
+                                          <button onClick={() => onDelete(p.id)} className="text-rose-600 hover:bg-rose-50 p-1.5 rounded">✕</button>
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                      {filtered.length === 0 && <div className="p-8 text-center text-slate-400">No records found.</div>}
+                  </div>
+                  <Pagination totalItems={filtered.length} itemsPerPage={itemsPerPage} currentPage={currentPage} setCurrentPage={setCurrentPage} />
+              </Section>
+          );
+      }
+
+      function NewReceiptSection({ units, addPayment, data }) {
+          const [form, setForm] = useState({ date: todayStr(), method: "Cash", purpose: "Rent" });
+          
+          useEffect(() => { if (!form.receiptNo) setForm(f => ({ ...f, receiptNo: nextReceiptNo(data.payments) })); }, [data.payments]);
+          
+          const handleUnitChange = (e) => {
+              const u = units.find(x => x.id === e.target.value);
+              if (u) setForm(f => ({ ...f, unitId: u.id, tenant: u.tenant, amount: u.rent }));
+          };
+
+          const submit = () => {
+              if (!form.unitId || !form.amount || !form.forMonth) return alert("Please fill all required fields");
+              addPayment({ ...form, amount: Number(form.amount), purpose: form.purpose });
+              setForm({ date: todayStr(), method: "Cash", purpose: "Rent", receiptNo: nextReceiptNo([...data.payments, form]) });
+          };
+
+          const selectedUnit = units.find(u => u.id === form.unitId);
+
+          return (
+              <div className="grid md:grid-cols-3 gap-6">
+                  <Section title="Issue Receipt" className="md:col-span-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <Input label="Date" type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+                          <Select label="Purpose" value={form.purpose} onChange={e => setForm({...form, purpose: e.target.value})}><option>Rent</option><option>Advance</option><option>Service Charge</option><option>Utility</option></Select>
+                          <Select label="Unit" value={form.unitId||""} onChange={handleUnitChange}>
+                              <option value="" disabled>Select Unit...</option>
+                              {units.map(u => <option key={u.id} value={u.id}>{u.name} {u.tenant ? `(${u.tenant})` : '- Vacant'}</option>)}
+                          </Select>
+                          <Input label="For Month" type="month" value={form.forMonth||""} onChange={e => setForm({...form, forMonth: e.target.value})} />
+                          <Input label="Tenant" value={form.tenant||""} onChange={e => setForm({...form, tenant: e.target.value})} />
+                          <Select label="Method" value={form.method} onChange={e => setForm({...form, method: e.target.value})}><option>Cash</option><option>Bank Transfer</option><option>Bkash</option><option>Nagad</option></Select>
+                          <div className="md:col-span-2">
+                              <Input label="Amount" type="number" value={form.amount||""} onChange={e => setForm({...form, amount: e.target.value})} className="font-bold text-lg text-indigo-600" placeholder="0.00" />
+                          </div>
+                          <div className="md:col-span-2">
+                              <Input placeholder="Notes (Optional)" value={form.notes||""} onChange={e => setForm({...form, notes: e.target.value})} />
+                          </div>
+                      </div>
+                      <div className="flex gap-4">
+                          <Button onClick={submit} className="flex-1 py-3 text-base shadow-md">Generate Receipt</Button>
+                          <Button variant="secondary" onClick={() => setForm({ date: todayStr(), method: "Cash", purpose: "Rent" })}>Reset</Button>
+                      </div>
+                  </Section>
+
+                  <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-6 h-fit">
+                      <h3 className="font-bold text-indigo-900 dark:text-indigo-300 mb-4 border-b border-indigo-200 pb-2">Receipt Preview</h3>
+                      {selectedUnit ? (
+                          <div className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
+                              <div className="flex justify-between"><span>Unit:</span> <span className="font-bold">{selectedUnit.name}</span></div>
+                              <div className="flex justify-between"><span>Tenant:</span> <span>{selectedUnit.tenant}</span></div>
+                              <div className="flex justify-between"><span>Standard Rent:</span> <span>{currency(selectedUnit.rent)}</span></div>
+                              <div className="mt-4 p-3 bg-white dark:bg-slate-900 rounded border border-indigo-100 dark:border-indigo-800 text-xs text-indigo-600">
+                                  Next Receipt No: <b>{form.receiptNo}</b><br/>
+                                  Month: <b>{form.forMonth ? formatMonth(form.forMonth) : '...'}</b>
+                              </div>
+                          </div>
+                      ) : (
+                          <div className="text-sm text-indigo-400 italic text-center py-8">Select a unit to see details</div>
+                      )}
+                  </div>
+              </div>
+          );
+      }
+
+      function ExpensesSection({ expenses, addExpense, onDelete }) {
+          const [form, setForm] = useState({ date: todayStr() });
+          const [currentPage, setCurrentPage] = useState(1);
+          const itemsPerPage = 10;
+
+          const sorted = useMemo(() => expenses.sort((a,b) => new Date(b.date)-new Date(a.date)), [expenses]);
+          const paginated = useMemo(() => {
+              const start = (currentPage - 1) * itemsPerPage;
+              return sorted.slice(start, start + itemsPerPage);
+          }, [sorted, currentPage]);
+          
+          return (
+              <div className="grid lg:grid-cols-3 gap-6">
+                  <Section title="Add Expense" className="h-fit">
+                      <div className="space-y-3">
+                          <Input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+                          <Input placeholder="Category (e.g. Repair)" value={form.category||""} onChange={e => setForm({...form, category: e.target.value})} />
+                          <Input placeholder="Vendor (Optional)" value={form.vendor||""} onChange={e => setForm({...form, vendor: e.target.value})} />
+                          <Input type="number" placeholder="Amount" value={form.amount||""} onChange={e => setForm({...form, amount: e.target.value})} />
+                          <Input placeholder="Notes" value={form.notes||""} onChange={e => setForm({...form, notes: e.target.value})} />
+                          <Button className="w-full" onClick={() => { if(!form.amount) return; addExpense(form); setForm({ date: todayStr() }); }}>Record Expense</Button>
+                      </div>
+                  </Section>
+                  <Section title="Expense Log" className="lg:col-span-2">
+                      <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm">
+                              <thead className="bg-slate-50 dark:bg-slate-700/50 text-left text-slate-500"><tr><th className="p-3 w-10 text-center">S.N.</th><th className="p-3">Date</th><th className="p-3">Details</th><th className="p-3 text-right">Amount</th><th className="p-3 text-center"></th></tr></thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                  {paginated.map((e, i) => (
+                                      <tr key={e.id}>
+                                          <td className="p-3 text-center text-xs text-slate-400">{(currentPage - 1) * itemsPerPage + i + 1}</td>
+                                          <td className="p-3 text-slate-500">{formatDisplayDate(e.date)}</td>
+                                          <td className="p-3"><div className="font-medium">{e.category}</div><div className="text-xs text-slate-400">{e.vendor}</div></td>
+                                          <td className="p-3 text-right font-medium text-rose-600">{currency(e.amount)}</td>
+                                          <td className="p-3 text-center"><button onClick={() => onDelete(e.id)} className="text-slate-400 hover:text-rose-600">✕</button></td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                      <Pagination totalItems={sorted.length} itemsPerPage={itemsPerPage} currentPage={currentPage} setCurrentPage={setCurrentPage} />
+                  </Section>
+              </div>
+          );
+      }
+
+      function StatementView({ payments, expenses, org }) {
+          const [range, setRange] = useState({ start: new Date().toISOString().slice(0, 8) + "01", end: todayStr() });
+          
+          const report = useMemo(() => {
+              const s = new Date(range.start).getTime();
+              const e = new Date(range.end).getTime() + 86400000;
+              const pItems = payments.filter(x => { const t = new Date(x.date).getTime(); return t >= s && t < e; }).map(x => ({ ...x, type: 'inc', desc: `Rent - ${x.tenant}` }));
+              const eItems = expenses.filter(x => { const t = new Date(x.date).getTime(); return t >= s && t < e; }).map(x => ({ ...x, type: 'exp', desc: `${x.category} (${x.vendor||'-'})` }));
+              
+              const all = [...pItems, ...eItems].sort((a,b) => new Date(a.date) - new Date(b.date));
+              const totalInc = pItems.reduce((sum, x) => sum + Number(x.amount), 0);
+              const totalExp = eItems.reduce((sum, x) => sum + Number(x.amount), 0);
+              
+              let bal = 0;
+              const rows = all.map(item => {
+                  bal += item.type === 'inc' ? Number(item.amount) : -Number(item.amount);
+                  return { ...item, bal };
+              });
+              
+              return { rows, totalInc, totalExp, net: totalInc - totalExp };
+          }, [payments, expenses, range]);
+
+          const printStatement = () => {
+              const w = window.open("", "_blank");
+              const html = `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Statement</title>
+                <style>
+                  body { font-family: sans-serif; font-size: 12px; padding: 20px; }
+                  .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+                  .header h1 { margin: 0; font-size: 20px; }
+                  .header p { margin: 2px 0; color: #555; }
+                  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                  th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+                  th { background: #f0f0f0; }
+                  .text-right { text-align: right; }
+                  .summary { margin-top: 20px; display: flex; justify-content: flex-end; gap: 20px; font-weight: bold; }
+                </style>
+              </head>
+              <body>
+                <div class="header">
+                  <h1>${escapeHTML(org.name)}</h1>
+                  <p>${escapeHTML(org.address)}</p>
+                  <p>Phone: ${escapeHTML(org.phone)}</p>
+                  <h3>Financial Statement</h3>
+                  <p>From: ${formatDisplayDate(range.start)} To: ${formatDisplayDate(range.end)}</p>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width: 40px">S.N.</th>
+                      <th>Date</th>
+                      <th>Description</th>
+                      <th>Type</th>
+                      <th class="text-right">Amount</th>
+                      <th class="text-right">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${report.rows.map((item, index) => `
+                      <tr>
+                        <td>${index + 1}</td>
+                        <td>${formatDisplayDate(item.date)}</td>
+                        <td>${escapeHTML(item.desc)}</td>
+                        <td>${item.type === 'inc' ? 'Income' : 'Expense'}</td>
+                        <td class="text-right">${currency(item.amount)}</td>
+                        <td class="text-right">${currency(item.bal)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+                <div class="summary">
+                  <div>Total Income: ${currency(report.totalInc)}</div>
+                  <div style="margin-left: 20px;">Total Expense: ${currency(report.totalExp)}</div>
+                  <div style="margin-left: 20px;">Net Profit: ${currency(report.net)}</div>
+                </div>
+                <script>window.print();<\/script>
+              </body>
+              </html>
+              `;
+              w.document.write(html);
+              w.document.close();
+          };
+
+          return (
+              <div className="space-y-6">
+                  <div className="flex gap-4 items-end bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <div className="flex-1"><label className="block text-xs font-bold uppercase text-slate-500 mb-1">From</label><Input type="date" value={range.start} onChange={e => setRange({...range, start: e.target.value})} /></div>
+                      <div className="flex-1"><label className="block text-xs font-bold uppercase text-slate-500 mb-1">To</label><Input type="date" value={range.end} onChange={e => setRange({...range, end: e.target.value})} /></div>
+                      <Button onClick={printStatement}>Print Report</Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                      <div className="p-4 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+                          <div className="text-xs font-bold uppercase opacity-70">Income</div>
+                          <div className="text-xl font-bold">{currency(report.totalInc)}</div>
+                      </div>
+                      <div className="p-4 bg-rose-50 text-rose-700 rounded-xl border border-rose-100">
+                          <div className="text-xs font-bold uppercase opacity-70">Expense</div>
+                          <div className="text-xl font-bold">{currency(report.totalExp)}</div>
+                      </div>
+                      <div className="p-4 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-100">
+                          <div className="text-xs font-bold uppercase opacity-70">Net Profit</div>
+                          <div className="text-xl font-bold">{currency(report.net)}</div>
+                      </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 print:border-black">
+                      <table className="min-w-full text-sm">
+                          <thead className="bg-slate-100 dark:bg-slate-800 font-bold text-slate-600">
+                              <tr><th className="p-3 w-10 text-center">S.N.</th><th className="p-3 text-left">Date</th><th className="p-3 text-left">Description</th><th className="p-3 text-right">Credit</th><th className="p-3 text-right">Debit</th><th className="p-3 text-right">Balance</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                              {report.rows.map((r, i) => (
+                                  <tr key={r.id}>
+                                      <td className="p-3 text-center text-xs text-slate-400">{i + 1}</td>
+                                      <td className="p-3 whitespace-nowrap">{formatDisplayDate(r.date)}</td>
+                                      <td className="p-3">{r.desc}</td>
+                                      <td className="p-3 text-right text-emerald-600">{r.type === 'inc' ? currency(r.amount) : '-'}</td>
+                                      <td className="p-3 text-right text-rose-600">{r.type === 'exp' ? currency(r.amount) : '-'}</td>
+                                      <td className="p-3 text-right font-mono font-bold text-slate-600 dark:text-slate-300">{currency(r.bal)}</td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          );
+      }
+      
+      function SettingsSection({ org, settings, updateOrg, updateSettings, data, setData }) {
+          const exportData = () => {
+              const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url; a.download = `backup_${todayStr()}.json`; a.click();
+          };
+          const importData = (e) => {
+              const fr = new FileReader();
+              fr.onload = (ev) => { setData(JSON.parse(ev.target.result)); alert("Restored!"); };
+              if (e.target.files[0]) fr.readAsText(e.target.files[0]);
+          };
+          
+          return (
+              <div className="grid md:grid-cols-2 gap-6">
+                  <Section title="Appearance">
+                      <div className="flex items-center justify-between mb-4">
+                          <span>Dark Mode</span>
+                          <button onClick={() => updateSettings({ darkMode: !settings.darkMode })} className={`w-12 h-6 rounded-full transition-colors relative ${settings.darkMode ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                              <span className={`absolute top-1 left-1 bg-white h-4 w-4 rounded-full transition-transform ${settings.darkMode ? 'translate-x-6' : ''}`} />
+                          </button>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                          {Object.entries(THEMES).map(([k,v]) => (
+                              <button key={k} onClick={() => updateSettings({ theme: k })} className={`w-8 h-8 rounded-full border-2 ${settings.theme === k ? 'border-slate-800 dark:border-white scale-110' : 'border-transparent'}`} style={{background: v.colors[500]}} />
+                          ))}
+                      </div>
+                  </Section>
+                  <Section title="Organization Info">
+                      <div className="space-y-3">
+                          <Input placeholder="Organization Name" value={org.name} onChange={e => updateOrg({ name: e.target.value })} />
+                          <Input placeholder="Address" value={org.address} onChange={e => updateOrg({ address: e.target.value })} />
+                          <Input placeholder="Phone" value={org.phone} onChange={e => updateOrg({ phone: e.target.value })} />
+                          <Input placeholder="Receipt Footer Note" value={org.note} onChange={e => updateOrg({ note: e.target.value })} />
+                      </div>
+                  </Section>
+                  <Section title="Data Management" className="md:col-span-2">
+                      <div className="flex flex-col md:flex-row gap-4">
+                          <Button onClick={exportData} className="flex-1">Download Backup</Button>
+                          <label className="flex-1 flex items-center justify-center px-4 py-2 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 dark:hover:bg-slate-700 text-indigo-600">
+                              Restore Backup <input type="file" className="hidden" onChange={importData} />
+                          </label>
+                          <Button variant="danger" onClick={() => { if(confirm("ERASE ALL DATA?")) setData({ ...initialData, settings: data.settings }); }}>Factory Reset</Button>
+                      </div>
+                  </Section>
+              </div>
+          );
+      }
+
+      /* ------------- Shared UI ------------- */
+      function StatCard({ label, value, icon, color, sub }) {
+          return (
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group hover:shadow-md transition">
+                  <div className="relative z-10">
+                      <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{label}</div>
+                      <div className={`text-2xl font-bold ${color}`}>{value}</div>
+                      {sub && <div className="text-xs text-slate-400 mt-1">{sub}</div>}
+                  </div>
+                  <div className="absolute right-4 bottom-4 text-4xl opacity-10 grayscale group-hover:grayscale-0 group-hover:opacity-20 transition-all group-hover:scale-110">{icon}</div>
+              </div>
+          );
+      }
+
+      function ReceiptModal({ org, payment, unit, onClose }) {
+        const ref = useRef();
+        const printNow = () => { const w = window.open("", "_blank"); w.document.write(renderReceiptHTML(org, payment, unit)); w.document.close(); w.focus(); setTimeout(() => w.print(), 200); };
+        return ( <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm"> <div ref={ref} className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95"> <div className="p-4 border-b flex items-center justify-between"> <h3 className="font-bold text-lg text-slate-900">Receipt #{payment.receiptNo}</h3> <div className="flex gap-2"> <Button variant="primary" onClick={printNow}>🖨️ Print</Button> <Button variant="secondary" onClick={onClose}>Close</Button> </div> </div> <div className="p-6 overflow-y-auto bg-slate-100 flex-1 flex items-center justify-center"> <div className="bg-white shadow-lg w-full max-w-[100%]" dangerouslySetInnerHTML={{ __html: renderReceiptInner(org, payment, unit) }} /> </div> </div> </div> );
+      }
+      
       function PasswordPromptModal({ currentUser, isPasswordCorrect, onClose, onSuccess, actionLabel }) {
           const [password, setPassword] = useState("");
           const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
@@ -374,7 +1010,7 @@
                           <Input type="password" placeholder="Enter Password" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={loading} autoFocus />
                           {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
                           <div className="flex justify-end gap-3 pt-2">
-                              <Button type="button" variant="ghost" onClick={onClose} className="w-full sm:w-auto">Cancel</Button>
+                              <Button type="button" variant="secondary" onClick={onClose} className="w-full sm:w-auto">Cancel</Button>
                               <Button type="submit" disabled={loading || !password} className="w-full sm:w-auto">{loading ? "Verifying..." : "Confirm"}</Button>
                           </div>
                       </form>
@@ -383,446 +1019,44 @@
           );
       }
 
-      function LoginScreen({ setAuthError }) {
+      /* ------------- Auth & Init ------------- */
+      function LoginScreen({ error }) {
           const [email, setEmail] = useState("");
-          const [password, setPassword] = useState(""); const [loading, setLoading] = useState(false);
-          const handleLogin = async (e) => { e.preventDefault(); setLoading(true); try { await auth.signInWithEmailAndPassword(email, password); } catch { setAuthError("Invalid credentials."); } finally { setLoading(false); } };
+          const [pass, setPass] = useState("");
+          const [loading, setLoading] = useState(false);
+          const handleLogin = async (e) => { e.preventDefault(); setLoading(true); try { await auth.signInWithEmailAndPassword(email, pass); } catch(err) { alert(err.message); setLoading(false); } };
+
           return (
-              <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4 transition-colors duration-300">
-                  <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 space-y-6 border dark:border-slate-700">
-                      <div className="text-center"><div className="mx-auto h-12 w-12 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg></div><h1 className="text-2xl font-bold text-slate-900 dark:text-white">Welcome Back</h1></div>
-                      <form onSubmit={handleLogin} className="space-y-4"><Input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} required /><Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required /><Button type="submit" className="w-full py-3 text-base" disabled={loading}>{loading ? "Signing In..." : "Sign In"}</Button></form>
-                      <p className="text-xs text-center text-slate-400 mt-4">Developed by Foyaz Chowdhury</p>
+              <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
+                  <div className="w-full max-w-sm bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700">
+                      <div className="text-center mb-8">
+                          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white mb-4"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></div>
+                          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">RMS</h1>
+                          <p className="text-slate-500 text-sm">Property Management System</p>
+                      </div>
+                      <form onSubmit={handleLogin} className="space-y-4">
+                          <Input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
+                          <Input type="password" placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} required />
+                          <Button type="submit" className="w-full py-2.5" loading={loading}>Sign In</Button>
+                      </form>
+                      {error && <div className="mt-4 p-3 bg-rose-50 text-rose-600 text-sm rounded-lg text-center">{error}</div>}
+                      <div className="mt-6 text-center text-xs text-slate-400 font-medium">Developed by <b>Foyaz Chowdhury</b></div>
                   </div>
               </div>
           );
       }
 
-      function AuthStatusWrapper() { const [currentUser, setCurrentUser] = useState(null); const [loading, setLoading] = useState(true);
-        useEffect(() => { const unsub = auth.onAuthStateChanged(u => { setCurrentUser(u); setLoading(false); }); return unsub; }, []);
-        if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>;
-        if (!currentUser) return <LoginScreen setAuthError={(e) => alert(e)} />; return <App currentUser={currentUser} />;
-      }
-     
-      /* ------------- Dashboard ------------- */
-      function DashboardSection({ totals, units, outstandingByUnit, unitsForReminder, setTab }) { 
-        const totalDue = Object.values(outstandingByUnit).reduce((s, v) => s + Math.max(0, v), 0);
-        const occupiedCount = units.filter(u => u.tenant).length;
-        const totalCount = units.length;
-        const occupancyRate = totalCount > 0 ? Math.round((occupiedCount / totalCount) * 100) : 0;
-        return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard label="Income" value={currency(totals.income)} color="text-emerald-600 dark:text-emerald-400" icon="💰" />
-              <StatCard label="Expenses" value={currency(totals.expense)} color="text-rose-600 dark:text-rose-400" icon="📉" />
-              <StatCard label="Net Profit" value={currency(totals.net)} color="text-indigo-600 dark:text-indigo-400" icon="📊" />
-              <StatCard label="Due Rent" value={currency(totalDue)} color="text-orange-500 dark:text-orange-400" icon="⚠️" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl p-6 text-white shadow-lg flex flex-col justify-between">
-                    <div><h3 className="text-indigo-100 font-medium mb-1">Occupancy Rate</h3><div className="text-4xl font-bold">{occupancyRate}%</div><div className="text-sm text-indigo-200 mt-2">{occupiedCount} of {totalCount} Units Occupied</div></div>
-                    <div className="mt-4 bg-white/20 h-2 rounded-full overflow-hidden"><div className="bg-white h-full" style={{ width: `${occupancyRate}%` }}></div></div>
-                </div>
-                <div className="md:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-                    <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><span>🔔</span> Pending Reminders {unitsForReminder.length > 0 && <span className="bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-200 text-xs px-2 py-0.5 rounded-full">{unitsForReminder.length}</span>}</h3>
-                    <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
-                        {unitsForReminder.length === 0 ?
-                        ( <p className="text-slate-500 dark:text-slate-400 text-sm italic">No reminders due today.</p> ) : ( unitsForReminder.map(u => ( <div key={u.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-100 dark:border-slate-600"> <div> <div className="font-medium text-sm text-slate-800 dark:text-slate-200">{u.name} <span className="text-slate-400">|</span> {u.tenant}</div> <div className="text-xs text-slate-500 dark:text-slate-400">Due: {u.dueDay}th</div> </div> <a href={u.whatsappLink} target="_blank" className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 p-2 rounded-full transition"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg></a> </div> )) )}
-                    </div>
-                </div>
-            </div>
-            <Section title="Unit Status & Dues">
-               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {units.map((u) => ( <div key={u.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-600 bg-white dark:bg-slate-700/50 hover:border-indigo-200 transition group"> <div> <div className="font-medium flex items-center gap-2 text-slate-700 dark:text-slate-200"> {u.name} {!u.tenant && <span className="text-[10px] bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-slate-500">Vacant</span>} </div> <div className="text-xs text-slate-400 mt-0.5">{u.tenant || "—"}</div> </div> <div className={classNames("font-bold text-sm", outstandingByUnit[u.id] > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}> {currency(outstandingByUnit[u.id])} </div> </div> ))}
-              </div>
-            </Section>
-          </div>
-        );
-      }
-      
-      /* ------------- Tables & Lists ------------- */
-      function DateRangeStatement({ payments, expenses, org }) {
-        const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10);
-        const [startDate, setStartDate] = useState(getFirstDayOfMonth(new Date())); 
-        const [endDate, setEndDate] = useState(todayStr());
-        const [filterType, setFilterType] = useState("All"); // "All", "Income", "Expense"
-
-        const filteredData = useMemo(() => {
-            const getLocalDateTimestamp = (dateStr) => { if (!dateStr) return 0; const parts = dateStr.split('-'); return new Date(parts[0], parts[1] - 1, parts[2]).getTime(); };
-            const start = getLocalDateTimestamp(startDate); 
-            const end = getLocalDateTimestamp(endDate) + 86400000;
-            
-            const incomeList = payments.filter(p => { const d = getLocalDateTimestamp(p.date); return d >= start && d < end; });
-            const expenseList = expenses.filter(e => { const d = getLocalDateTimestamp(e.date); return d >= start && d < end; });
-            
-            let combinedList = [ 
-                ...incomeList.map(p => ({ id: `P-${p.id}`, rawDate: p.date, description: `${p.purpose || "Rent"} - ${p.unitId} (${p.tenant})`, type: 'Income', amount: Number(p.amount || 0) })), 
-                ...expenseList.map(e => ({ id: `E-${e.id}`, rawDate: e.date, description: `${e.category} (${e.vendor || '-'})`, type: 'Expense', amount: -Number(e.amount || 0) })), 
-            ].sort((a, b) => new Date(a.rawDate) - new Date(b.rawDate));
-
-            // Apply Filter
-            if (filterType === "Income") {
-                combinedList = combinedList.filter(i => i.type === 'Income');
-            } else if (filterType === "Expense") {
-                combinedList = combinedList.filter(i => i.type === 'Expense');
-            }
-
-            let runningBalance = 0;
-            const finalList = combinedList.map(item => { 
-                runningBalance += item.amount; 
-                return { ...item, balance: runningBalance, displayAmount: Math.abs(item.amount) }; 
-            });
-
-            return { 
-                combinedList: finalList, 
-                totalIncome: incomeList.reduce((sum, p) => sum + Number(p.amount || 0), 0), 
-                totalExpense: expenseList.reduce((sum, e) => sum + Number(e.amount || 0), 0), 
-                netProfit: incomeList.reduce((sum, p) => sum + Number(p.amount || 0), 0) - expenseList.reduce((sum, e) => sum + Number(e.amount || 0), 0) 
-            };
-        }, [payments, expenses, startDate, endDate, filterType]);
-
-        const printStatement = () => {
-            const w = window.open("", "_blank");
-            const html = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>Statement</title>
-              <style>
-                body { font-family: sans-serif; font-size: 12px; padding: 20px; }
-                .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-                .header h1 { margin: 0; font-size: 20px; }
-                .header p { margin: 2px 0; color: #555; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-                th { background: #f0f0f0; }
-                .text-right { text-align: right; }
-                .summary { margin-top: 20px; display: flex; justify-content: flex-end; gap: 20px; font-weight: bold; }
-              </style>
-            </head>
-            <body>
-              <div class="header">
-                <h1>${escapeHTML(org.name)}</h1>
-                <p>${escapeHTML(org.address)}</p>
-                <p>Phone: ${escapeHTML(org.phone)}</p>
-                <h3>Financial Statement (${filterType})</h3>
-                <p>From: ${formatDisplayDate(startDate)} To: ${formatDisplayDate(endDate)}</p>
-              </div>
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width: 40px">S.N.</th>
-                    <th>Date</th>
-                    <th>Description</th>
-                    <th>Type</th>
-                    <th class="text-right">Amount</th>
-                    ${filterType === 'All' ? '<th class="text-right">Balance</th>' : ''}
-                  </tr>
-                </thead>
-                <tbody>
-                  ${filteredData.combinedList.map((item, index) => `
-                    <tr>
-                      <td>${index + 1}</td>
-                      <td>${formatDisplayDate(item.rawDate)}</td>
-                      <td>${escapeHTML(item.description)}</td>
-                      <td>${item.type}</td>
-                      <td class="text-right">${currency(item.displayAmount)}</td>
-                      ${filterType === 'All' ? `<td class="text-right">${currency(item.balance)}</td>` : ''}
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-              <div class="summary">
-                ${filterType !== 'Expense' ? `<div>Total Income: ${currency(filteredData.totalIncome)}</div>` : ''}
-                ${filterType !== 'Income' ? `<div>Total Expense: ${currency(filteredData.totalExpense)}</div>` : ''}
-                ${filterType === 'All' ? `<div>Net Profit: ${currency(filteredData.netProfit)}</div>` : ''}
-              </div>
-              <script>window.print();<\/script>
-            </body>
-            </html>
-            `;
-            w.document.write(html);
-            w.document.close();
-        };
-
-        return (
-            <div className="space-y-6">
-                <div className="flex flex-col md:flex-row gap-4 bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
-                    <div className="flex-1"><label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 block">From</label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
-                    <div className="flex-1"><label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 block">To</label><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
-                    <div className="w-full md:w-48"><label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 block">Type</label>
-                        <Select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-                            <option value="All">All Transactions</option>
-                            <option value="Income">Income Only</option>
-                            <option value="Expense">Expense Only</option>
-                        </Select>
-                    </div>
-                    <div className="flex items-end">
-                        <Button onClick={printStatement} className="w-full md:w-auto h-[46px] flex items-center gap-2 justify-center">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                            Print
-                        </Button>
-                    </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2 md:gap-4">
-                    <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 text-center"><div className="text-xs text-emerald-600 dark:text-emerald-400 uppercase font-bold">Income</div><div className="text-lg md:text-xl font-bold text-emerald-700 dark:text-emerald-300">{currency(filteredData.totalIncome)}</div></div>
-                    <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-xl border border-rose-100 dark:border-rose-800 text-center"><div className="text-xs text-rose-600 dark:text-rose-400 uppercase font-bold">Expense</div><div className="text-lg md:text-xl font-bold text-rose-700 dark:text-rose-300">{currency(filteredData.totalExpense)}</div></div>
-                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 text-center"><div className="text-xs text-indigo-600 dark:text-indigo-400 uppercase font-bold">Net</div><div className="text-lg md:text-xl font-bold text-indigo-700 dark:text-indigo-300">{currency(filteredData.netProfit)}</div></div>
-                </div>
-                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full text-xs md:text-sm">
-                            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
-                                <tr>
-                                    <th className="p-3 text-center w-10">S.N.</th>
-                                    <th className="p-3 text-left">Date</th>
-                                    <th className="p-3 text-left">Description</th>
-                                    <th className="p-3 text-right">Amount</th>
-                                    <th className="p-3 text-right">Balance</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {filteredData.combinedList.length === 0 ? 
-                                    ( <tr><td colSpan="5" className="p-8 text-center text-slate-400">No transactions found.</td></tr> ) : 
-                                    ( filteredData.combinedList.map((item, index) => ( 
-                                        <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition"> 
-                                            <td className="p-3 text-center text-slate-400">{index + 1}</td>
-                                            <td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{formatDisplayDate(item.rawDate)}</td> 
-                                            <td className="p-3 max-w-[150px] truncate text-slate-700 dark:text-slate-200">{item.description}</td> 
-                                            <td className={`p-3 text-right font-medium ${item.type === 'Income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}> {item.type === 'Expense' ? '-' : '+'}{currency(item.displayAmount)} </td> 
-                                            <td className="p-3 text-right text-slate-500 dark:text-slate-400 font-mono">{currency(item.balance)}</td> 
-                                        </tr> 
-                                    )) )
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        );
+      function AuthWrapper() {
+          const [user, setUser] = useState(null);
+          const [loading, setLoading] = useState(true);
+          useEffect(() => auth.onAuthStateChanged(u => { setUser(u); setLoading(false); }), []);
+          
+          if (loading) return <div className="min-h-screen flex items-center justify-center dark:bg-slate-900"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>;
+          return user ? <ToastProvider><App currentUser={user} /></ToastProvider> : <LoginScreen />;
       }
 
-      function StatCard({ label, value, color, icon }) { return ( <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between"> <div> <div className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wide">{label}</div> <div className={`text-xl md:text-2xl font-bold ${color} mt-1`}>{value}</div> </div> <div className="text-2xl opacity-80">{icon}</div> </div> ); }
-
-      function UnitsTable({ units, upsertUnit, deleteUnit }) {
-        const [unitForm, setUnitForm] = useState({});
-        const [showProfileId, setShowProfileId] = useState(null); const profileUnit = units.find(u => u.id === showProfileId);
-        const reset = () => setUnitForm({});
-        const submit = () => { if (!unitForm.id || !unitForm.name) return alert("Fill ID and Name"); upsertUnit({ ...unitForm, rent: Number(unitForm.rent || 0), dueDay: Number(unitForm.dueDay || 1) }); reset(); };
-        return (
-          <div className="grid lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700 rounded-xl p-5 space-y-4 h-fit">
-              <h3 className="font-bold text-slate-800 dark:text-slate-200">Add / Edit Unit</h3>
-              <div className="space-y-3">
-                <div className="flex gap-2"><div className="w-1/3"><Input placeholder="ID (A1)" value={unitForm.id || ""} onChange={(e) => setUnitForm({ ...unitForm, id: e.target.value })} /></div><div className="w-2/3"><Select value={unitForm.type} onChange={(e) => setUnitForm({ ...unitForm, type: e.target.value })}><option>Flat</option><option>Shop</option></Select></div></div>
-                <Input placeholder="Unit Name" value={unitForm.name || ""} onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })} />
-                <div className="flex gap-2"><Input type="number" placeholder="Rent Amount" value={unitForm.rent ?? ""} onChange={(e) => setUnitForm({ ...unitForm, rent: e.target.value })} /><Input type="number" placeholder="Due Day" value={unitForm.dueDay ?? ""} onChange={(e) => setUnitForm({ ...unitForm, dueDay: e.target.value })} /></div>
-                <hr className="border-slate-200 dark:border-slate-600" />
-                <Input placeholder="Tenant Name" value={unitForm.tenant || ""} onChange={(e) => setUnitForm({ ...unitForm, tenant: e.target.value })} />
-                <Input placeholder="Phone (WhatsApp)" value={unitForm.tenantPhone || ""} onChange={(e) => setUnitForm({ ...unitForm, tenantPhone: e.target.value })} />
-                <Checkbox id="enableReminder" label="Enable WhatsApp Reminder" checked={unitForm.enableReminder} onChange={(e) => setUnitForm({ ...unitForm, enableReminder: e.target.checked })} />
-                <hr className="border-slate-200 dark:border-slate-600" />
-                <FileUpload label="Photo" urlKey="tenantPhoto" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.tenantPhotoUrl} /><FileUpload label="NID" urlKey="tenantNid" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.tenantNidUrl} /><FileUpload label="Agreement" urlKey="rentAgreement" unitId={unitForm.id} setUnitForm={setUnitForm} currentUrl={unitForm.rentAgreementUrl} />
-              </div>
-              <div className="flex gap-2 pt-2"><Button onClick={submit} className="flex-1">{unitForm.id ? "Save" : "Add"}</Button><Button variant="secondary" onClick={reset}>Clear</Button>{unitForm.id && <Button variant="danger" onClick={() => deleteUnit(unitForm.id)}>Delete</Button>}</div>
-            </div>
-            <div className="lg:col-span-2 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-              <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 text-left"><tr><th className="p-3">Unit</th><th className="p-3">Tenant</th><th className="p-3 text-right">Rent</th><th className="p-3 text-center">Action</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{units.map((u) => ( <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50"><td className="p-3"><div className="font-medium text-slate-800 dark:text-slate-200">{u.name}</div><div className="text-xs text-slate-400">{u.id} • {u.type}</div></td><td className="p-3"> {u.tenant ? ( <div className="text-slate-700 dark:text-slate-300">{u.tenant}</div> ) : ( <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">Vacant</span> )}</td><td className="p-3 text-right font-mono text-slate-600 dark:text-slate-300">{currency(u.rent)}</td><td className="p-3 flex justify-center gap-2"><button className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1.5 rounded" onClick={() => setUnitForm(u)}>✎</button><button className="text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 p-1.5 rounded" onClick={() => setShowProfileId(u.id)}>👁️</button></td></tr> ))}</tbody></table></div>
-            </div>
-            {profileUnit && (
-                <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-800 w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 border dark:border-slate-700">
-                        <div className="bg-slate-50 dark:bg-slate-700/50 p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center"><h3 className="font-bold text-lg text-slate-800 dark:text-white">Tenant Profile</h3><button onClick={() => setShowProfileId(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button></div>
-                        <div className="p-6 space-y-4">
-                            <div className="flex items-center gap-4"><div className="h-16 w-16 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center text-2xl overflow-hidden text-slate-500 dark:text-slate-400">{profileUnit.tenantPhotoUrl ? <img src={profileUnit.tenantPhotoUrl} className="h-full w-full object-cover" /> : "👤"}</div><div><div className="text-xl font-bold text-slate-800 dark:text-white">{profileUnit.tenant || "No Tenant"}</div><div className="text-slate-500 dark:text-slate-400">{profileUnit.name}</div></div></div>
-                            <div className="grid grid-cols-2 gap-4 py-2"><div className="bg-slate-50 dark:bg-slate-700/30 p-3 rounded-lg border border-slate-100 dark:border-slate-700"><div className="text-xs text-slate-500 dark:text-slate-400 uppercase">Phone</div><div className="font-medium text-slate-700 dark:text-slate-200">{profileUnit.tenantPhone || "N/A"}</div></div><div className="bg-slate-50 dark:bg-slate-700/30 p-3 rounded-lg border border-slate-100 dark:border-slate-700"><div className="text-xs text-slate-500 dark:text-slate-400 uppercase">Rent</div><div className="font-medium text-slate-700 dark:text-slate-200">{currency(profileUnit.rent)}</div></div></div>
-                            <div className="space-y-2"><div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Documents</div><div className="flex gap-2">{profileUnit.tenantNidUrl ? <a href={profileUnit.tenantNidUrl} target="_blank" className="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded border border-indigo-100 dark:border-indigo-800">View NID</a> : <span className="text-xs text-slate-400 italic">No NID</span>}{profileUnit.rentAgreementUrl ? <a href={profileUnit.rentAgreementUrl} target="_blank" className="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded border border-indigo-100 dark:border-indigo-800">View Agreement</a> : <span className="text-xs text-slate-400 italic">No Agreement</span>}</div></div>
-                        </div>
-                    </div>
-                </div>
-            )}
-          </div>
-        );
-      }
-
-      function PaymentsTable({ payments, units, onRowClick, onDelete }) {
-        const [search, setSearch] = useState("");
-        const filtered = useMemo(() => { 
-            if (!search) return payments; 
-            const q = search.toLowerCase(); 
-            return payments.filter(p => (p.receiptNo || "").toLowerCase().includes(q) || (p.tenant || "").toLowerCase().includes(q)).sort((a, b) => new Date(b.date) - new Date(a.date)); 
-        }, [payments, search]);
-
-        return (
-            <div className="space-y-4">
-            <Input placeholder="Search receipt number or tenant..." value={search} onChange={(e) => setSearch(e.target.value)} />
-            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                        <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 text-left">
-                            <tr>
-                                <th className="p-3 w-10 text-center">S.N.</th>
-                                <th className="p-3">Date</th>
-                                <th className="p-3">Receipt</th>
-                                <th className="p-3">Tenant</th>
-                                <th className="p-3 text-right">Amount</th>
-                                <th className="p-3 text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                            {filtered.map((p, i) => ( 
-                                <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                    <td className="p-3 text-center text-xs text-slate-400">{i + 1}</td>
-                                    <td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{formatDisplayDate(p.date)}</td>
-                                    <td className="p-3 font-mono text-xs text-slate-500 dark:text-slate-400">{p.receiptNo}</td>
-                                    <td className="p-3">
-                                        <div className="font-medium text-slate-800 dark:text-slate-200">{p.tenant}</div>
-                                        <div className="text-xs text-slate-400">{units.find(u => u.id === p.unitId)?.name || p.unitId}</div>
-                                    </td>
-                                    <td className="p-3 text-right font-medium text-slate-700 dark:text-slate-200">{currency(p.amount)}</td>
-                                    <td className="p-3 flex justify-center gap-2">
-                                        <button className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 px-2 py-1 rounded text-xs" onClick={() => onRowClick(p)}>Print</button>
-                                        <button className="bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 px-2 py-1 rounded text-xs" onClick={() => onDelete(p.id)}>Del</button>
-                                    </td>
-                                </tr> 
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            </div>
-        );
-      }
-
-      function NewReceiptForm({ units, addPayment, data }) {
-        const [form, setForm] = useState({ date: todayStr(), method: "Cash", purpose: "Rent And Service Charge" });
-        useEffect(() => { if (!form.receiptNo) setForm((f) => ({ ...f, receiptNo: nextReceiptNo(data.payments) })); }, [data.payments, form.receiptNo]);
-        const resetForm = () => setForm({ date: todayStr(), method: "Cash", purpose: "Rent And Service Charge", receiptNo: nextReceiptNo(data.payments) });
-        const submit = () => { if (!form.unitId || !form.tenant || !form.amount || !form.forMonth) return alert("Please complete all fields."); addPayment({ ...form, amount: Number(form.amount || 0), purpose: form.purpose || "Rent And Service Charge" }); alert(`Receipt ${form.receiptNo} created ✅`); setForm({ date: todayStr(), method: form.method, purpose: form.purpose || "Rent And Service Charge", receiptNo: nextReceiptNo([...data.payments, form]) }); };
-        const unit = units.find((u) => u.id === form.unitId);
-        return (
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-2 space-y-4">
-               <div className="flex flex-col sm:flex-row gap-3"><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Date</label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Purpose</label><Select value={form.purpose || "Rent And Service Charge"} onChange={(e) => setForm({ ...form, purpose: e.target.value })}><option>Rent And Service Charge</option><option>Advance</option><option>Utility</option><option>Service</option><option>Other</option></Select></div></div>
-               <div className="flex flex-col sm:flex-row gap-3"><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Unit</label><Select value={form.unitId || ""} onChange={(e) => { const u = units.find(x => x.id === e.target.value); setForm(f => ({ ...f, unitId: e.target.value, tenant: u?.tenant || "", amount: u?.rent || "" })); }}><option value="" disabled>Select Unit</option>{units.map((u) => <option key={u.id} value={u.id}>{u.name} {u.tenant ? `(${u.tenant})` : '- Vacant'}</option>)}</Select></div><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">For Month</label><Input type="month" value={form.forMonth || ""} onChange={(e) => setForm({ ...form, forMonth: e.target.value })} /></div></div>
-              <div><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Tenant Name</label><Input placeholder="Enter Name" value={form.tenant || ""} onChange={(e) => setForm({ ...form, tenant: e.target.value })} /></div>
-              <div className="flex flex-col sm:flex-row gap-3"><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Amount (৳)</label><Input type="number" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="font-bold text-indigo-700 dark:text-indigo-400" /></div><div className="flex-1"><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Method</label><Select value={form.method || ""} onChange={(e) => setForm({ ...form, method: e.target.value })}><option>Cash</option><option>Bkash</option><option>Nagad</option><option>Bank Transfer</option></Select></div></div>
-              <Input placeholder="Notes (Optional)" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-              <div className="flex gap-3 pt-2"><Button onClick={submit} className="flex-1 py-3 text-base shadow-md">Generate Receipt</Button><Button variant="secondary" onClick={resetForm}>Reset</Button></div>
-            </div>
-            <div className="md:col-span-1 h-fit bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-5">
-              <div className="font-bold text-indigo-800 dark:text-indigo-300 border-b border-indigo-200 dark:border-indigo-700 pb-2 mb-3">Preview</div>
-              {unit ? ( <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300"> <div className="flex justify-between"><span>Unit:</span> <span className="font-medium">{unit.name}</span></div><div className="flex justify-between"><span>Rent:</span> <span>{currency(unit.rent)}</span></div><div className="flex justify-between"><span>Tenant:</span> <span className="font-medium">{unit.tenant || "Vacant"}</span></div><div className="mt-4 p-3 bg-white dark:bg-slate-800 rounded-lg border border-indigo-100 dark:border-indigo-900 text-xs text-indigo-600 dark:text-indigo-400"> Receipt <b>{form.receiptNo}</b> will be generated for <b>{form.forMonth ? formatMonth(form.forMonth) : "..."}</b>. </div></div> ) : ( <div className="text-sm text-indigo-400 italic">Select a unit to see details.</div> )}
-            </div>
-          </div>
-        );
-      }
-
-      function ExpensesSection({ expenses, addExpense, onDeleteExpense }) {
-        const [form, setForm] = useState({ date: todayStr() });
-        const resetForm = () => setForm({ date: todayStr() }); 
-        
-        const submit = () => { 
-            if (!form.category || !form.amount) return alert("Fill required fields");
-            addExpense({ ...form, amount: Number(form.amount || 0) }); 
-            resetForm(); 
-        }; 
-        
-        const list = useMemo(() => expenses.sort((a, b) => new Date(b.date) - new Date(a.date)), [expenses]);
-
-        return ( 
-          <div className="grid lg:grid-cols-3 gap-6"> 
-            <div className="lg:col-span-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 space-y-4 h-fit"> 
-              <h3 className="font-bold text-slate-800 dark:text-slate-200">New Expense</h3> 
-              <div className="space-y-3">
-                  <div><label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-1 block">Date</label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /> </div>
-                  <Input placeholder="Category (e.g. Utility)" value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} /> 
-                  <Input placeholder="Vendor (Optional)" value={form.vendor || ""} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /> 
-                  <Input type="number" placeholder="Amount (৳)" value={form.amount ?? ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} /> 
-                  <Input placeholder="Notes" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /> 
-              </div>
-              <Button onClick={submit} className="w-full">Save Expense</Button> 
-            </div> 
-            <div className="lg:col-span-2 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"> 
-              <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm"> 
-                      <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 text-left"> 
-                          <tr> 
-                              <th className="p-3 w-10 text-center">S.N.</th>
-                              <th className="p-3">Date</th> 
-                              <th className="p-3">Category</th> 
-                              <th className="p-3">Note</th> 
-                              <th className="p-3 text-right">Amount</th> 
-                              <th className="p-3 text-center">Action</th> 
-                          </tr> 
-                      </thead> 
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-700"> 
-                          {list.map((e, i) => ( 
-                              <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50"> 
-                                  <td className="p-3 text-center text-xs text-slate-400">{i + 1}</td>
-                                  <td className="p-3 text-slate-600 dark:text-slate-300">{formatDisplayDate(e.date)}</td> 
-                                  <td className="p-3"> <div className="font-medium text-slate-800 dark:text-slate-200">{e.category}</div> {e.vendor && <div className="text-xs text-slate-400">{e.vendor}</div>} </td>
-                                  <td className="p-3 text-slate-600 dark:text-slate-300 text-xs">{e.notes || "-"}</td>
-                                  <td className="p-3 text-right text-rose-600 dark:text-rose-400 font-medium">{currency(e.amount)}</td> 
-                                  <td className="p-3 text-center"><button className="text-rose-500 hover:text-rose-700" onClick={() => onDeleteExpense(e.id)}>✕</button></td> 
-                              </tr> 
-                          ))} 
-                      </tbody> 
-                  </table> 
-              </div>
-            </div> 
-          </div> 
-        );
-      }
-
-      function OrgSettings({ org, settings, updateOrg, updateSettings, clearOrgFields, restoreDemoOrg, clearPayments, clearExpenses, factoryReset, exportData, importData }) {
-        const theme = settings?.theme || 'indigo'; const darkMode = settings?.darkMode || false;
-        return (
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-                    <h3 className="font-bold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-3 mb-4">App Appearance</h3>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-700 dark:text-slate-300">Dark Mode</span><button onClick={() => updateSettings({ darkMode: !darkMode })} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}><span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${darkMode ? 'translate-x-6' : 'translate-x-1'}`}/></button></div>
-                        <div><span className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-2">Color Theme</span><div className="flex gap-3 flex-wrap">{Object.entries(THEMES).map(([key, t]) => ( <button key={key} onClick={() => updateSettings({ theme: key })} className={`h-8 w-8 rounded-full border-2 flex items-center justify-center transition-all ${theme === key ? 'border-slate-600 dark:border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: t.colors[500] }} title={t.name}> {theme === key && <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>} </button> ))}</div></div>
-                    </div>
-               </div>
-               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-                    <h3 className="font-bold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-3 mb-4">Organization Info</h3>
-                    <div className="space-y-3"><Input placeholder="Name" value={org.name || ""} onChange={(e) => updateOrg({ name: e.target.value })} /><Input placeholder="Address" value={org.address || ""} onChange={(e) => updateOrg({ address: e.target.value })} /><Input placeholder="Phone" value={org.phone || ""} onChange={(e) => updateOrg({ phone: e.target.value })} /><Input placeholder="Email" value={org.email || ""} onChange={(e) => updateOrg({ email: e.target.value })} /><Input placeholder="Receipt Footer Note" value={org.note || ""} onChange={(e) => updateOrg({ note: e.target.value })} /><div className="flex gap-2 pt-2"><Button variant="secondary" onClick={clearOrgFields} className="text-xs">Clear</Button><Button variant="secondary" onClick={restoreDemoOrg} className="text-xs">Default</Button></div></div>
-               </div>
-            </div>
-            <div className="space-y-4">
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-5">
-                    <h3 className="font-bold text-indigo-900 dark:text-indigo-300 border-b border-indigo-200 dark:border-indigo-700 pb-3 mb-4 flex items-center gap-2"><span>💾</span> Data Backup & Recovery</h3>
-                        <div className="space-y-4"><div><p className="text-xs text-indigo-700 dark:text-indigo-400 mb-2">Download a copy of all your data.</p><Button variant="primary" onClick={exportData} className="w-full">Download Backup File</Button></div><div className="border-t border-indigo-200 dark:border-indigo-700 pt-3"><p className="text-xs text-indigo-700 dark:text-indigo-400 mb-2">Restore from a backup file.</p><label className="flex items-center justify-center w-full px-4 py-2 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 rounded-lg cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition"><span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Select File to Import</span><input type="file" className="hidden" accept="application/json" onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} /></label></div></div>
-                </div>
-                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-xl p-5 h-fit">
-                    <h3 className="font-bold text-rose-800 dark:text-rose-300 border-b border-rose-200 dark:border-rose-800 pb-3 mb-4">Danger Zone</h3>
-                    <div className="space-y-3"><Button variant="danger" onClick={clearPayments} className="w-full justify-start bg-rose-500">Clear Payment History</Button><Button variant="danger" onClick={clearExpenses} className="w-full justify-start bg-rose-500">Clear Expense History</Button><div className="pt-4 mt-4 border-t border-rose-200 dark:border-rose-800"><Button variant="danger" onClick={factoryReset} className="w-full justify-start font-bold bg-rose-700">Factory Reset (Erase All)</Button></div></div><p className="text-xs text-rose-600 dark:text-rose-400 mt-3 bg-rose-100 dark:bg-rose-900/30 p-2 rounded">⚠️ Actions here are permanent.</p>
-                </div>
-            </div>
-          </div>
-        );
-      }
-
-      /* ------------- Receipt Modal ------------- */
-      function ReceiptModal({ org, payment, unit, onClose }) {
-        const ref = useRef();
-        const printNow = () => { const w = window.open("", "_blank"); w.document.write(renderReceiptHTML(org, payment, unit)); w.document.close(); w.focus(); setTimeout(() => w.print(), 200); };
-        return ( <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm"> <div ref={ref} className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95"> <div className="p-4 border-b flex items-center justify-between"> <h3 className="font-bold text-lg">Receipt #{payment.receiptNo}</h3> <div className="flex gap-2"> <Button variant="primary" onClick={printNow}>🖨️ Print</Button> <Button variant="secondary" onClick={onClose}>Close</Button> </div> </div> <div className="p-6 overflow-y-auto bg-slate-100 flex-1 flex items-center justify-center"> <div className="bg-white shadow-lg w-full max-w-[100%]" dangerouslySetInnerHTML={{ __html: renderReceiptInner(org, payment, unit) }} /> </div> </div> </div> );
-      }
-      function escapeHTML(str) { return String(str || "").replace(/[&<>'"/]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;","/":"&#x2F;"}[c] || c)); }
-      function renderReceiptInner(org, payment, unit) { 
-          const unitName = unit?.name || payment.unitId || "N/A"; 
-          const formattedMonth = formatMonth(payment.forMonth); 
-          const displayDate = formatDisplayDate(payment.date); 
-          const displayPurpose = (payment.purpose === "Rent" || !payment.purpose) ? "Rent And Service Charge" : payment.purpose;
-          return ` <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 20px; background: white; border: 1px solid #ddd;"> <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;"> <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1> <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)}</p> </div> <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2> <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;"> <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span> <span><b>Date:</b> ${escapeHTML(displayDate)}</span> </div> <table style="width:100%; font-size:14px; border-collapse: collapse;"> <tr><td style="padding:4px 0;"><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td></tr> <tr> <td style="padding:4px 0;"><b>For Unit No:</b> ${escapeHTML(unitName)}</td> <td style="padding:4px 0;"><b>Purpose:</b> ${escapeHTML(displayPurpose)}</td> </tr> <tr> <td style="padding:4px 0;"><b>For The Month:</b> ${escapeHTML(formattedMonth)}</td> <td style="padding:4px 0;"><b>Method:</b> ${escapeHTML(payment.method)}</td> </tr> <tr> <td style="padding:4px 0;"><b>In Words:</b> ${amountToWords(payment.amount)}</td> <td style="padding:4px 0;"><b>Amount:</b> <b style="font-size:16px;">${currency(payment.amount)}</b></td> </tr> </table> ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""} <div style="height:30px;"></div> <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;"> <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div> <div style="margin-right:10px;"><div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px; text-align:center;">Authorized Signature</div></div> </div> </div> `;
-      }
-      function renderReceiptHTML(org, payment, unit) { return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Receipt</title><style>@media print{@page{size:A4 portrait;margin:0.5mm}body{background:white!important}.sheet{height:60mm;max-width:200mm;margin-bottom:3mm;padding:8px;page-break-after:always;border:1px dotted #ccc}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;padding:0}</style></head><body><div class="sheet">${renderReceiptInner(org, payment, unit)}</div></body></html>`; }
-
-      ReactDOM.createRoot(document.getElementById("root")).render(<AuthStatusWrapper />);
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<AuthWrapper />);
     </script>
   </body>
 </html>
