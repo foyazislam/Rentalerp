@@ -5,18 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
     <title>Home/Shop RMS Pro</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React & DOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Chart.js for Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- Firebase SDKs (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -52,12 +48,14 @@
 
     <style>
       /* Base Styles */
-      html, body { height: 100%; transition: background-color 0.3s ease, color 0.3s ease; overscroll-behavior-y: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      html, body { height: 100%; transition: background-color 0.3s ease, color 0.3s ease; overscroll-behavior-y: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
       body { -webkit-tap-highlight-color: transparent; }
       
       /* Theme Variables */
       :root {
-        --theme-50: #eef2ff; --theme-100: #e0e7ff; --theme-200: #c7d2fe; --theme-300: #a5b4fc; --theme-400: #818cf8;
+        --theme-50: #eef2ff;
+        --theme-100: #e0e7ff; --theme-200: #c7d2fe; --theme-300: #a5b4fc; --theme-400: #818cf8;
         --theme-500: #6366f1; --theme-600: #4f46e5; --theme-700: #4338ca; --theme-800: #3730a3; --theme-900: #312e81;
       }
 
@@ -79,7 +77,6 @@
 
     <script type="text/babel">
       const { useEffect, useMemo, useRef, useState, createContext, useContext } = React;
-      
       /* ------------- Firebase Config ------------- */
       // NOTE: Ensure your API Key is correct and allows the necessary domains
       const firebaseConfig = {
@@ -90,7 +87,6 @@
         messagingSenderId: "860746996508",
         appId: "1:860746996508:web:7a9360811037941725b8d9"
       };
-      
       if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
       const db = firebase.firestore();
       const auth = firebase.auth();
@@ -102,15 +98,12 @@
 
       const ToastProvider = ({ children }) => {
           const [toasts, setToasts] = useState([]);
-          
           const addToast = (msg, type = 'success') => {
               const id = Date.now();
               setToasts(prev => [...prev, { id, msg, type }]);
               setTimeout(() => removeToast(id), 3000);
           };
-
           const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
-
           return (
               <ToastContext.Provider value={{ addToast }}>
                   {children}
@@ -132,14 +125,14 @@
         emerald: { name: 'Forest', colors: { 50:'#ecfdf5', 100:'#d1fae5', 200:'#a7f3d0', 300:'#6ee7b7', 400:'#34d399', 500:'#10b981', 600:'#059669', 700:'#047857', 800:'#065f46', 900:'#064e3b' }},
         slate: { name: 'Graphite', colors: { 50:'#f8fafc', 100:'#f1f5f9', 200:'#e2e8f0', 300:'#cbd5e1', 400:'#94a3b8', 500:'#64748b', 600:'#475569', 700:'#334155', 800:'#1e293b', 900:'#0f172a' }},
       };
-
       /* ------------- Utilities ------------- */
       const todayStr = () => new Date().toISOString().slice(0, 10);
       const formatDisplayDate = (dateStr) => { if (!dateStr) return ""; const [y, m, d] = dateStr.split('-'); return `${d}-${m}-${y}`; };
       // Old receipt logic preferred "Taka Only"
-      const currency = (n) => { const num = Number(n || 0); try { return num.toLocaleString(undefined, { style: "currency", currency: "BDT" }).replace("BDT", "৳").trim(); } catch { return `৳${num.toLocaleString()}`; } };
-      const formatMonth = (ym) => { if (!ym || ym.length !== 7) return "N/A"; const [year, month] = ym.split('-'); const date = new Date(year, month - 1, 1); return date.toLocaleString('default', { month: 'long', year: 'numeric' }); };
-      
+      const currency = (n) => { const num = Number(n || 0);
+      try { return num.toLocaleString(undefined, { style: "currency", currency: "BDT" }).replace("BDT", "৳").trim(); } catch { return `৳${num.toLocaleString()}`; } };
+      const formatMonth = (ym) => { if (!ym || ym.length !== 7) return "N/A"; const [year, month] = ym.split('-');
+      const date = new Date(year, month - 1, 1); return date.toLocaleString('default', { month: 'long', year: 'numeric' }); };
       const amountToWords = (n) => {
           if (typeof n !== 'number') { n = Number(n); }
           if (isNaN(n) || n <= 0) { return "Zero Taka Only"; }
@@ -164,14 +157,17 @@
           let paisa = Math.round((totalAmount - taka) * 100);
           let words = helper(taka).trim();
           if (words) words += ' Taka'; else words = '';
-          if (paisa > 0) { if (words) words += ' and '; let paisaWords = helper(paisa).trim(); if (paisaWords) words += paisaWords + ' Paisa'; else words += `${String(paisa).padStart(2, '0')}/100 Paisa`; }
+          if (paisa > 0) { if (words) words += ' and '; let paisaWords = helper(paisa).trim();
+          if (paisaWords) words += paisaWords + ' Paisa'; else words += `${String(paisa).padStart(2, '0')}/100 Paisa`;
+          }
           if (words) words += ' Only';
           return words.replace(/\s+/g, ' ').trim() || "Zero Taka Only";
       };
 
-      const monthKey = (dateStr) => { const d = new Date(dateStr); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
-      const nextReceiptNo = (allPayments) => { const yyyymm = monthKey(new Date().toISOString()); const prefix = `RC-${yyyymm}-`; const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1; return `${prefix}${String(count).padStart(4, "0")}`; };
-      
+      const monthKey = (dateStr) => { const d = new Date(dateStr);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+      const nextReceiptNo = (allPayments) => { const yyyymm = monthKey(new Date().toISOString());
+      const prefix = `RC-${yyyymm}-`; const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1; return `${prefix}${String(count).padStart(4, "0")}`; };
       const exportToCSV = (data, filename) => {
           const csvContent = "data:text/csv;charset=utf-8," + data.map(e => e.join(",")).join("\n");
           const encodedUri = encodeURI(csvContent);
@@ -182,7 +178,6 @@
           link.click();
           document.body.removeChild(link);
       };
-
       // Receipt Helpers
       function escapeHTML(str) { return String(str || "").replace(/[&<>'"/]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;","/":"&#x2F;"}[c] || c)); }
       function renderReceiptInner(org, payment, unit) { 
@@ -195,42 +190,43 @@
       function renderReceiptHTML(org, payment, unit) { return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Receipt</title><style>@media print{@page{size:A4 portrait;margin:0}body{margin:0!important}.sheet{height:98mm;width:100%;padding:5mm;box-sizing:border-box;page-break-inside:avoid;border-bottom:1px dashed #ccc}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;padding:10px;max-width:210mm;}</style></head><body><div class="sheet">${renderReceiptInner(org, payment, unit)}</div></body></html>`; }
 
       const classNames = (...c) => c.filter(Boolean).join(" ");
-      if (!(window.crypto && window.crypto.randomUUID)) { window.crypto = window.crypto || {}; window.crypto.randomUUID = function () { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { const r = (Math.random() * 16) | 0; const v = c === 'x' ? r : (r & 0x3) | 0x8; return v.toString(16); }); }; }
+      if (!(window.crypto && window.crypto.randomUUID)) { window.crypto = window.crypto || {};
+      window.crypto.randomUUID = function () { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { const r = (Math.random() * 16) | 0; const v = c === 'x' ? r : (r & 0x3) | 0x8; return v.toString(16); });
+      }; }
       
       const shouldShowReminder = (dueDay) => { const today = new Date(); return Math.abs(today.getDate() - Number(dueDay)) <= 2; }
-      const createWhatsAppLink = (phone, unitName, orgName, dueDay, rent) => { if (!phone) return null; const p = phone.replace(/\D/g, ''); const msg = `*Rent Reminder from ${orgName}*\n\nDear tenant of ${unitName},\n\nYour rent of ${currency(rent)} is due by date ${dueDay}.\nPlease pay on time.\nThank you!`; return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`; };
+      const createWhatsAppLink = (phone, unitName, orgName, dueDay, rent) => { if (!phone) return null;
+      const p = phone.replace(/\D/g, ''); const msg = `*Rent Reminder from ${orgName}*\n\nDear tenant of ${unitName},\n\nYour rent of ${currency(rent)} is due by date ${dueDay}.\nPlease pay on time.\nThank you!`;
+      return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`; };
 
       /* ------------- Initial Data ------------- */
       const initialData = {
         org: { name: "Shahjahan Chowdhury Bari", address: "Bashundhara R/A, Dhaka-1230", phone: "+8801749333661", email: "info@example.com", note: "Thank you for your payment!", },
-        settings: { theme: 'indigo', darkMode: false },
+        settings: { theme: 'indigo', darkMode: false, backupUrl: "" },
         units: [ ...Array.from({ length: 5 }).map((_, i) => ({ id: `F${i + 1}`, type: "Flat", name: `Flat ${i + 1}`, rent: 15000, dueDay: 5, tenant: "", tenantPhone: "", enableReminder: true })), ],
         payments: [], expenses: []
       };
-
       /* ------------- Cloud Storage ------------- */
       const loadData = async (uid) => { 
         try { 
-            const doc = await db.doc(`erp_data/${uid}`).get(); 
+            const doc = await db.doc(`erp_data/${uid}`).get();
             if (doc.exists) {
                 const saved = doc.data();
                 return { ...initialData, ...saved };
             }
-            return initialData; 
+            return initialData;
         } catch (e) { console.error(e); return initialData; } 
       };
       const saveData = async (data, uid) => { 
-        if (!uid) return; 
+        if (!uid) return;
         try { await db.doc(`erp_data/${uid}`).set({ ...data }); } catch (e) { console.error(e); } 
       };
-      
       const uploadFile = async (file, unitId, type) => { 
           const user = auth.currentUser;
           if (!user) throw new Error("Login required");
           const ref = storage.ref(`tenant_docs/${user.uid}/${unitId}/${type}/${file.name}`);
           await ref.put(file); return await ref.getDownloadURL(); 
       };
-
       /* ------------- Components ------------- */
       const Section = ({ title, right, children, className }) => (
         <div className={classNames("bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 transition-all", className)}>
@@ -241,18 +237,15 @@
           {children}
         </div>
       );
-
       const Input = (props) => (
           <input {...props} className={classNames("w-full rounded-lg border px-3 py-2.5 text-sm shadow-sm transition-colors border-slate-300 bg-white text-slate-700 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-900/50 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-60", props.className)} />
       );
-
       const Select = (props) => (
           <div className="relative w-full">
             <select {...props} className={classNames("w-full rounded-lg border px-3 py-2.5 text-sm shadow-sm appearance-none transition-colors border-slate-300 bg-white text-slate-700 dark:border-slate-600 dark:bg-slate-900/50 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500", props.className)} />
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500"><svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg></div>
           </div>
       );
-
       const Button = ({ children, variant = "primary", className, loading, ...rest }) => {
         const styles = {
           primary: "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-sm",
@@ -274,7 +267,6 @@
               {label && <label htmlFor={id} className="ml-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer select-none">{label}</label>}
           </div>
       );
-
       const ChartComponent = ({ data, type = 'bar', title }) => {
         const canvasRef = useRef(null);
         const chartRef = useRef(null);
@@ -312,7 +304,6 @@
 
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       };
-
       const Pagination = ({ totalItems, itemsPerPage, currentPage, setCurrentPage }) => {
         const pages = Math.ceil(totalItems / itemsPerPage);
         if (pages <= 1) return null;
@@ -324,7 +315,6 @@
           </div>
         )
       };
-
       function FileUpload({ label, urlKey, unitId, setUnitForm, currentUrl }) {
           const [uploading, setUploading] = useState(false);
           const { addToast } = useToast();
@@ -360,25 +350,22 @@
         const [showSettingsPrompt, setShowSettingsPrompt] = useState(false);
         const { addToast } = useToast();
         const uid = currentUser?.uid;
-        
+
         // Theme Effect
         useEffect(() => {
             const settings = data.settings || { theme: 'indigo', darkMode: false };
             const themeKey = settings.theme || 'indigo';
             const themeColors = THEMES[themeKey]?.colors || THEMES.indigo.colors;
             const root = document.documentElement;
-            
             Object.entries(themeColors).forEach(([shade, value]) => { root.style.setProperty(`--theme-${shade}`, value); });
             if (settings.darkMode) root.classList.add('dark'); else root.classList.remove('dark');
         }, [data.settings]);
-        
         // Cloud Sync
         useEffect(() => { 
             if (!uid) return;
             setLoading(true); 
             loadData(uid).then(init => { setData(init); setLoading(false); }); 
         }, [uid]);
-        
         // Auto Save Debounce
         useEffect(() => { 
             if (loading || !uid) return; 
@@ -397,30 +384,62 @@
             setData(d => ({ ...d, units: d.units.filter(u => u.id !== id) })); 
             addToast("Unit deleted");
         };
-
         const isPasswordCorrect = async (password) => { 
-            if (!currentUser?.email) return false; 
+            if (!currentUser?.email) return false;
             try { await auth.signInWithEmailAndPassword(currentUser.email, password); return true; } catch { return false; } 
         };
-
         const deletePayment = (id) => {
-            setData((d) => ({ ...d, payments: d.payments.filter((p) => p.id !== id) })); 
+            setData((d) => ({ ...d, payments: d.payments.filter((p) => p.id !== id) }));
             setDeleteRequest(null); 
             addToast("Payment deleted", "error"); 
         };
         const deleteExpense = (id) => { 
-            setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) })); 
+            setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) }));
             setDeleteRequest(null); 
             addToast("Expense deleted", "error"); 
         };
 
+        /* --- Google Sheet Sync --- */
+        const syncToSheet = (payload) => {
+          const url = data.settings?.backupUrl;
+          if (!url) return;
+          fetch(url, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          }).then(() => console.log("Sent to Sheet")).catch(e => console.error("Sheet sync error", e));
+        };
+
         const addPayment = (p) => {
-            setData(d => ({ ...d, payments: [{ ...p, id: crypto.randomUUID() }, ...d.payments] }));
+            const newPayment = { ...p, id: crypto.randomUUID() };
+            setData(d => ({ ...d, payments: [newPayment, ...d.payments] }));
             addToast(`Receipt ${p.receiptNo} created`);
+            syncToSheet({
+              type: "Income",
+              date: p.date,
+              amount: Number(p.amount),
+              desc: `Rent: ${p.tenant} (${p.unitId})`,
+              receiptNo: p.receiptNo,
+              unit: p.unitId,
+              tenant: p.tenant,
+              month: p.forMonth,
+              method: p.method
+            });
         };
         const addExpense = (e) => {
-            setData(d => ({ ...d, expenses: [{ ...e, id: crypto.randomUUID() }, ...d.expenses] }));
+            const newExpense = { ...e, id: crypto.randomUUID() };
+            setData(d => ({ ...d, expenses: [newExpense, ...d.expenses] }));
             addToast("Expense recorded");
+            syncToSheet({
+              type: "Expense",
+              date: e.date,
+              amount: -Math.abs(Number(e.amount)),
+              desc: `${e.category} - ${e.vendor || 'No Vendor'}`,
+              category: e.category,
+              vendor: e.vendor || "",
+              notes: e.notes || ""
+            });
         };
 
         const totals = useMemo(() => {
@@ -428,7 +447,6 @@
             const expense = data.expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
             return { income, expense, net: income - expense };
         }, [data.payments, data.expenses]);
-
         const chartData = useMemo(() => {
             // Last 6 months data for chart
             const labels = [];
@@ -471,7 +489,6 @@
                 <div className="text-slate-500 animate-pulse">Loading your data...</div>
             </div>
         );
-
         return (
           <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 pb-safe-bottom transition-colors duration-300">
             <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 shadow-sm no-print">
@@ -488,11 +505,12 @@
               <nav className="mx-auto max-w-6xl px-4 overflow-x-auto custom-scrollbar">
                 <div className="flex gap-1 pb-2 min-w-max">
                    {[ ["dashboard", "Dashboard"], ["units", "Units"], ["payments", "History"], ["newReceipt", "+ Receipt"], ["statement", "Statement"], ["expenses", "Expenses"], ["settings", "Settings"] ].map(([key, label]) => (
-                    <button key={key} onClick={() => { if (key === 'settings' && currentUser) setShowSettingsPrompt(true); else setTab(key); }}
+                     <button key={key} onClick={() => { if (key === 'settings' && currentUser) setShowSettingsPrompt(true);
+                      else setTab(key); }}
                       className={classNames("px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap", tab === key ? "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300" : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700")}>
                       {label}
                     </button>
-                  ))}
+                   ))}
                 </div>
               </nav>
             </header>
@@ -508,7 +526,8 @@
             </main>
 
             {showReceipt && <ReceiptModal org={data.org} payment={showReceipt} unit={data.units.find(u => u.id === showReceipt.unitId)} onClose={() => setShowReceipt(null)} />}
-            {(showSettingsPrompt || deleteRequest) && <PasswordPromptModal currentUser={currentUser} isPasswordCorrect={isPasswordCorrect} onClose={() => { setShowSettingsPrompt(false); setDeleteRequest(null); }} onSuccess={() => { if (showSettingsPrompt) { setTab('settings'); setShowSettingsPrompt(false); } else if (deleteRequest) { if (deleteRequest.type === 'payment') deletePayment(deleteRequest.id); else if (deleteRequest.type === 'expense') deleteExpense(deleteRequest.id); } }} actionLabel={showSettingsPrompt ? "Access Settings" : "Delete Record"} />}
+            {(showSettingsPrompt || deleteRequest) && <PasswordPromptModal currentUser={currentUser} isPasswordCorrect={isPasswordCorrect} onClose={() => { setShowSettingsPrompt(false); setDeleteRequest(null); }} onSuccess={() => { if (showSettingsPrompt) { setTab('settings'); setShowSettingsPrompt(false);
+            } else if (deleteRequest) { if (deleteRequest.type === 'payment') deletePayment(deleteRequest.id); else if (deleteRequest.type === 'expense') deleteExpense(deleteRequest.id); } }} actionLabel={showSettingsPrompt ? "Access Settings" : "Delete Record"} />}
           </div>
         );
       }
@@ -560,7 +579,6 @@
           const [search, setSearch] = useState("");
           
           const filtered = units.filter(u => u.name.toLowerCase().includes(search.toLowerCase()) || (u.tenant||"").toLowerCase().includes(search.toLowerCase()));
-          
           return (
               <div className="grid lg:grid-cols-3 gap-6">
                   <Section title={form.id ? "Edit Unit" : "Add Unit"} className="h-fit">
@@ -623,7 +641,6 @@
           const [monthFilter, setMonthFilter] = useState("");
           const [currentPage, setCurrentPage] = useState(1);
           const itemsPerPage = 10;
-          
           const filtered = useMemo(() => {
               let res = payments;
               if (monthFilter) res = res.filter(p => (p.forMonth || "").startsWith(monthFilter));
@@ -633,12 +650,10 @@
               }
               return res.sort((a,b) => new Date(b.date) - new Date(a.date));
           }, [payments, search, monthFilter]);
-
           const paginated = useMemo(() => {
               const start = (currentPage - 1) * itemsPerPage;
               return filtered.slice(start, start + itemsPerPage);
           }, [filtered, currentPage]);
-
           useEffect(() => setCurrentPage(1), [search, monthFilter]);
 
           const exportCsv = () => {
@@ -646,7 +661,6 @@
               const rows = filtered.map(p => [p.date, p.receiptNo, p.unitId, p.tenant, p.forMonth, p.amount, p.method]);
               exportToCSV([header, ...rows], `payments_${todayStr()}.csv`);
           };
-
           return (
               <Section title="Transaction History" right={
                   <div className="flex gap-2">
@@ -688,20 +702,16 @@
 
       function NewReceiptSection({ units, addPayment, data }) {
           const [form, setForm] = useState({ date: todayStr(), method: "Cash", purpose: "Rent" });
-          
           useEffect(() => { if (!form.receiptNo) setForm(f => ({ ...f, receiptNo: nextReceiptNo(data.payments) })); }, [data.payments]);
-          
           const handleUnitChange = (e) => {
               const u = units.find(x => x.id === e.target.value);
               if (u) setForm(f => ({ ...f, unitId: u.id, tenant: u.tenant, amount: u.rent }));
           };
-
           const submit = () => {
               if (!form.unitId || !form.amount || !form.forMonth) return alert("Please fill all required fields");
               addPayment({ ...form, amount: Number(form.amount), purpose: form.purpose });
               setForm({ date: todayStr(), method: "Cash", purpose: "Rent", receiptNo: nextReceiptNo([...data.payments, form]) });
           };
-
           const selectedUnit = units.find(u => u.id === form.unitId);
 
           return (
@@ -760,7 +770,6 @@
               const start = (currentPage - 1) * itemsPerPage;
               return sorted.slice(start, start + itemsPerPage);
           }, [sorted, currentPage]);
-          
           return (
               <div className="grid lg:grid-cols-3 gap-6">
                   <Section title="Add Expense" className="h-fit">
@@ -798,7 +807,6 @@
 
       function StatementView({ payments, expenses, org }) {
           const [range, setRange] = useState({ start: new Date().toISOString().slice(0, 8) + "01", end: todayStr() });
-          
           const report = useMemo(() => {
               const s = new Date(range.start).getTime();
               const e = new Date(range.end).getTime() + 86400000;
@@ -814,10 +822,8 @@
                   bal += item.type === 'inc' ? Number(item.amount) : -Number(item.amount);
                   return { ...item, bal };
               });
-              
               return { rows, totalInc, totalExp, net: totalInc - totalExp };
           }, [payments, expenses, range]);
-
           const printStatement = () => {
               const w = window.open("", "_blank");
               const html = `
@@ -929,6 +935,8 @@
       }
       
       function SettingsSection({ org, settings, updateOrg, updateSettings, data, setData }) {
+          const [showTutorial, setShowTutorial] = useState(false);
+          
           const exportData = () => {
               const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
               const url = URL.createObjectURL(blob);
@@ -939,7 +947,6 @@
               fr.onload = (ev) => { setData(JSON.parse(ev.target.result)); alert("Restored!"); };
               if (e.target.files[0]) fr.readAsText(e.target.files[0]);
           };
-          
           return (
               <div className="grid md:grid-cols-2 gap-6">
                   <Section title="Appearance">
@@ -956,6 +963,24 @@
                           ))}
                       </div>
                   </Section>
+                  
+                  <Section title="Google Sheet Backup">
+                       <div className="space-y-3">
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                              Script Web App URL
+                          </label>
+                          <Input 
+                              placeholder="https://script.google.com/macros/s/..." 
+                              value={settings.backupUrl || ""} 
+                              onChange={e => updateSettings({ backupUrl: e.target.value })} 
+                          />
+                          <div className="flex justify-between items-center text-xs text-slate-500">
+                             <span>Auto-sync enabled when URL is present.</span>
+                             <button onClick={() => setShowTutorial(true)} className="text-indigo-600 font-bold hover:underline">How to setup?</button>
+                          </div>
+                      </div>
+                  </Section>
+
                   <Section title="Organization Info">
                       <div className="space-y-3">
                           <Input placeholder="Organization Name" value={org.name} onChange={e => updateOrg({ name: e.target.value })} />
@@ -973,6 +998,8 @@
                           <Button variant="danger" onClick={() => { if(confirm("ERASE ALL DATA?")) setData({ ...initialData, settings: data.settings }); }}>Factory Reset</Button>
                       </div>
                   </Section>
+                  
+                  {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
               </div>
           );
       }
@@ -997,10 +1024,122 @@
         return ( <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm"> <div ref={ref} className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95"> <div className="p-4 border-b flex items-center justify-between"> <h3 className="font-bold text-lg text-slate-900">Receipt #{payment.receiptNo}</h3> <div className="flex gap-2"> <Button variant="primary" onClick={printNow}>🖨️ Print</Button> <Button variant="secondary" onClick={onClose}>Close</Button> </div> </div> <div className="p-6 overflow-y-auto bg-slate-100 flex-1 flex items-center justify-center"> <div className="bg-white shadow-lg w-full max-w-[100%]" dangerouslySetInnerHTML={{ __html: renderReceiptInner(org, payment, unit) }} /> </div> </div> </div> );
       }
       
+      function TutorialModal({ onClose }) {
+          const scriptCode = `function doPost(e) {
+  var lock = LockService.getScriptLock();
+  lock.tryLock(10000); 
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var data = JSON.parse(e.postData.contents);
+    
+    // Safety check for amount
+    var rawAmount = data.amount;
+    var amountVal = parseFloat(rawAmount);
+    if (isNaN(amountVal)) amountVal = 0;
+
+    // --- 1. LEDGER ---
+    var sheetLedger = ss.getSheetByName("Ledger");
+    if (sheetLedger) {
+      sheetLedger.appendRow([data.date, data.type, data.desc, amountVal]);
+    }
+
+    // --- 2. DETAILS ---
+    if (data.type === "Income") {
+      var sheetReceipts = ss.getSheetByName("Receipts");
+      if (sheetReceipts) {
+        sheetReceipts.appendRow([
+          data.date, 
+          "'" + data.receiptNo, 
+          data.unit, 
+          data.tenant, 
+          data.month, 
+          data.method, 
+          Math.abs(amountVal)
+        ]);
+      }
+    } 
+    else if (data.type === "Expense") {
+      var sheetExpenses = ss.getSheetByName("Expenses");
+      if (sheetExpenses) {
+        sheetExpenses.appendRow([
+          data.date, 
+          data.category, 
+          data.vendor, 
+          data.notes, 
+          Math.abs(amountVal)
+        ]);
+      }
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({"result":"success"})).setMimeType(ContentService.MimeType.JSON);
+  } catch(e) {
+    return ContentService.createTextOutput(JSON.stringify({"result":"error", "error": e.toString()})).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
+}`;
+          return (
+              <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+                  <div className="bg-white dark:bg-slate-800 w-full max-w-3xl rounded-xl shadow-2xl p-6 overflow-y-auto max-h-[90vh] custom-scrollbar">
+                      <div className="flex justify-between items-center mb-4">
+                          <h2 className="text-xl font-bold text-slate-800 dark:text-white">Setup Google Sheet Backup</h2>
+                          <button onClick={onClose} className="text-2xl text-slate-400 hover:text-rose-500">&times;</button>
+                      </div>
+                      <div className="space-y-6 text-sm text-slate-600 dark:text-slate-300">
+                          
+                          <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg space-y-2">
+                              <h3 className="font-bold text-indigo-700 dark:text-indigo-300">Step 1: Create Sheets & Columns</h3>
+                              <p>Create a new Google Sheet. Rename the tabs at the bottom to <b>exactly</b> these names (case sensitive). Then add these headers in the first row:</p>
+                              <ul className="list-disc ml-5 space-y-1 mt-2 font-mono text-xs">
+                                  <li><b>Ledger</b> (Tab 1) -> A1:Date, B1:Type, C1:Desc, D1:Amount, E1:Balance</li>
+                                  <li><b>Receipts</b> (Tab 2) -> A1:Date, B1:Receipt No, C1:Unit, D1:Tenant, E1:Month, F1:Method, G1:Amount</li>
+                                  <li><b>Expenses</b> (Tab 3) -> A1:Date, B1:Category, C1:Vendor, D1:Notes, E1:Amount</li>
+                              </ul>
+                          </div>
+
+                          <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg space-y-2">
+                              <h3 className="font-bold text-indigo-700 dark:text-indigo-300">Step 2: Add Balance Formula</h3>
+                              <p>In the <b>Ledger</b> tab, paste this formula into cell <code className="bg-white dark:bg-slate-700 px-1 rounded font-bold">E2</code> (It will calculate balance for all rows automatically):</p>
+                              <div className="p-2 bg-slate-800 text-green-400 rounded font-mono text-xs select-all">
+                                =ARRAYFORMULA(IF(A2:A="", "", SCAN(0, D2:D, LAMBDA(acc, val, acc + val))))
+                              </div>
+                          </div>
+
+                          <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg space-y-2">
+                              <h3 className="font-bold text-indigo-700 dark:text-indigo-300">Step 3: Add The Script</h3>
+                              <p>Go to <b>Extensions &gt; Apps Script</b>. Delete any code there, copy the code below, and paste it in:</p>
+                              <textarea readOnly className="w-full h-40 p-2 bg-slate-800 text-slate-100 rounded font-mono text-xs focus:ring-2 ring-indigo-500 outline-none" value={scriptCode} onClick={(e) => e.target.select()}></textarea>
+                              <p className="text-xs italic text-slate-500">Click inside the box to select all, then copy (Ctrl+C).</p>
+                          </div>
+
+                          <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg space-y-2">
+                              <h3 className="font-bold text-indigo-700 dark:text-indigo-300">Step 4: Deploy</h3>
+                              <ul className="list-decimal ml-5 space-y-1">
+                                  <li>Click the blue <b>Deploy</b> button (top right) &gt; <b>New Deployment</b>.</li>
+                                  <li>Select type: <b>Web App</b>.</li>
+                                  <li>Description: "RMS v1".</li>
+                                  <li>Execute as: <b>Me</b> (your email).</li>
+                                  <li>Who has access: <b>Anyone</b> (Important!).</li>
+                                  <li>Click <b>Deploy</b> and copy the <b>Web App URL</b>.</li>
+                                  <li>Paste that URL into the Settings box in this app.</li>
+                              </ul>
+                          </div>
+                      </div>
+                      <div className="mt-6 flex justify-end">
+                          <Button onClick={onClose} className="w-full md:w-auto">I Have Copied The URL</Button>
+                      </div>
+                  </div>
+              </div>
+          )
+      }
+
       function PasswordPromptModal({ currentUser, isPasswordCorrect, onClose, onSuccess, actionLabel }) {
           const [password, setPassword] = useState("");
           const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
-          const handleSubmit = async (e) => { e.preventDefault(); if (!currentUser) { onSuccess(); return; } setLoading(true); setError(""); const correct = await isPasswordCorrect(password); setLoading(false); if (correct) onSuccess(); else { setError("Incorrect password."); setPassword(""); } };
+          const handleSubmit = async (e) => { e.preventDefault();
+          if (!currentUser) { onSuccess(); return; } setLoading(true); setError(""); const correct = await isPasswordCorrect(password); setLoading(false); if (correct) onSuccess();
+          else { setError("Incorrect password."); setPassword(""); } };
           return (
               <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm transition-all">
                   <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 border dark:border-slate-700">
@@ -1024,8 +1163,8 @@
           const [email, setEmail] = useState("");
           const [pass, setPass] = useState("");
           const [loading, setLoading] = useState(false);
-          const handleLogin = async (e) => { e.preventDefault(); setLoading(true); try { await auth.signInWithEmailAndPassword(email, pass); } catch(err) { alert(err.message); setLoading(false); } };
-
+          const handleLogin = async (e) => { e.preventDefault(); setLoading(true);
+          try { await auth.signInWithEmailAndPassword(email, pass); } catch(err) { alert(err.message); setLoading(false); } };
           return (
               <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
                   <div className="w-full max-w-sm bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700">
@@ -1050,7 +1189,6 @@
           const [user, setUser] = useState(null);
           const [loading, setLoading] = useState(true);
           useEffect(() => auth.onAuthStateChanged(u => { setUser(u); setLoading(false); }), []);
-          
           if (loading) return <div className="min-h-screen flex items-center justify-center dark:bg-slate-900"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>;
           return user ? <ToastProvider><App currentUser={user} /></ToastProvider> : <LoginScreen />;
       }
