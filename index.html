@@ -1038,13 +1038,24 @@
     var amountVal = parseFloat(rawAmount);
     if (isNaN(amountVal)) amountVal = 0;
 
-    // --- 1. LEDGER ---
+    // --- 1. LEDGER (Smart Write) ---
     var sheetLedger = ss.getSheetByName("Ledger");
     if (sheetLedger) {
-      sheetLedger.appendRow([data.date, data.type, data.desc, amountVal]);
+      // Find the next empty row based specifically on Column A (Date)
+      // This ignores the formula in Column E preventing the "Row 1000" bug.
+      var lastRow = getLastRowInColumn(sheetLedger, 1); // 1 = Column A
+      var nextRow = lastRow + 1;
+      
+      // Write Date, Type, Desc, Amount to Columns A, B, C, D
+      sheetLedger.getRange(nextRow, 1, 1, 4).setValues([[
+        data.date, 
+        data.type, 
+        data.desc, 
+        amountVal
+      ]]);
     }
 
-    // --- 2. DETAILS ---
+    // --- 2. RECEIPTS (Normal Append) ---
     if (data.type === "Income") {
       var sheetReceipts = ss.getSheetByName("Receipts");
       if (sheetReceipts) {
@@ -1059,6 +1070,7 @@
         ]);
       }
     } 
+    // --- 3. EXPENSES (Normal Append) ---
     else if (data.type === "Expense") {
       var sheetExpenses = ss.getSheetByName("Expenses");
       if (sheetExpenses) {
@@ -1078,6 +1090,22 @@
   } finally {
     lock.releaseLock();
   }
+}
+
+// Helper function to find the real last row with data in a specific column
+function getLastRowInColumn(sheet, columnNumber) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow === 0) return 0;
+  
+  var range = sheet.getRange(1, columnNumber, lastRow);
+  var values = range.getValues();
+  
+  for (var i = values.length - 1; i >= 0; i--) {
+    if (values[i][0] !== "" && values[i][0] != null) {
+      return i + 1;
+    }
+  }
+  return 0; // If column is completely empty
 }`;
           return (
               <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
