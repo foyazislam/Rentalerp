@@ -29,18 +29,9 @@
                 500: 'var(--theme-500)', 600: 'var(--theme-600)', 700: 'var(--theme-700)', 800: 'var(--theme-800)', 900: 'var(--theme-900)',
               }
             },
-            padding: {
-              'safe-bottom': 'env(safe-area-inset-bottom)',
-            },
-            animation: {
-                'slide-up': 'slideUp 0.3s ease-out forwards',
-            },
-            keyframes: {
-                slideUp: {
-                    '0%': { transform: 'translateY(100%)', opacity: '0' },
-                    '100%': { transform: 'translateY(0)', opacity: '1' },
-                }
-            }
+            padding: { 'safe-bottom': 'env(safe-area-inset-bottom)' },
+            animation: { 'slide-up': 'slideUp 0.3s ease-out forwards' },
+            keyframes: { slideUp: { '0%': { transform: 'translateY(100%)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } } }
           }
         }
       }
@@ -54,8 +45,7 @@
       
       /* Theme Variables */
       :root {
-        --theme-50: #eef2ff;
-        --theme-100: #e0e7ff; --theme-200: #c7d2fe; --theme-300: #a5b4fc; --theme-400: #818cf8;
+        --theme-50: #eef2ff; --theme-100: #e0e7ff; --theme-200: #c7d2fe; --theme-300: #a5b4fc; --theme-400: #818cf8;
         --theme-500: #6366f1; --theme-600: #4f46e5; --theme-700: #4338ca; --theme-800: #3730a3; --theme-900: #312e81;
       }
 
@@ -65,10 +55,7 @@
       .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
       .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
 
-      /* Mobile Input Optimization */
       input[type="date"], input[type="month"] { -webkit-appearance: none; appearance: none; background-color: transparent; min-height: 42px; }
-      
-      /* Print Hiding */
       @media print { .no-print { display: none !important; } }
     </style>
   </head>
@@ -78,7 +65,6 @@
     <script type="text/babel">
       const { useEffect, useMemo, useRef, useState, createContext, useContext } = React;
       /* ------------- Firebase Config ------------- */
-      // NOTE: Ensure your API Key is correct and allows the necessary domains
       const firebaseConfig = {
         apiKey: "AIzaSyBR20axEzJjcoNNyGxxxvc6AZYrxPBQ6M4",
         authDomain: "homeshop-rms.firebaseapp.com",
@@ -125,14 +111,12 @@
         emerald: { name: 'Forest', colors: { 50:'#ecfdf5', 100:'#d1fae5', 200:'#a7f3d0', 300:'#6ee7b7', 400:'#34d399', 500:'#10b981', 600:'#059669', 700:'#047857', 800:'#065f46', 900:'#064e3b' }},
         slate: { name: 'Graphite', colors: { 50:'#f8fafc', 100:'#f1f5f9', 200:'#e2e8f0', 300:'#cbd5e1', 400:'#94a3b8', 500:'#64748b', 600:'#475569', 700:'#334155', 800:'#1e293b', 900:'#0f172a' }},
       };
+
       /* ------------- Utilities ------------- */
       const todayStr = () => new Date().toISOString().slice(0, 10);
       const formatDisplayDate = (dateStr) => { if (!dateStr) return ""; const [y, m, d] = dateStr.split('-'); return `${d}-${m}-${y}`; };
-      // Old receipt logic preferred "Taka Only"
-      const currency = (n) => { const num = Number(n || 0);
-      try { return num.toLocaleString(undefined, { style: "currency", currency: "BDT" }).replace("BDT", "৳").trim(); } catch { return `৳${num.toLocaleString()}`; } };
-      const formatMonth = (ym) => { if (!ym || ym.length !== 7) return "N/A"; const [year, month] = ym.split('-');
-      const date = new Date(year, month - 1, 1); return date.toLocaleString('default', { month: 'long', year: 'numeric' }); };
+      const currency = (n) => { const num = Number(n || 0); try { return num.toLocaleString(undefined, { style: "currency", currency: "BDT" }).replace("BDT", "৳").trim(); } catch { return `৳${num.toLocaleString()}`; } };
+      const formatMonth = (ym) => { if (!ym || ym.length !== 7) return "N/A"; const [year, month] = ym.split('-'); return new Date(year, month - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' }); };
       const amountToWords = (n) => {
           if (typeof n !== 'number') { n = Number(n); }
           if (isNaN(n) || n <= 0) { return "Zero Taka Only"; }
@@ -157,17 +141,13 @@
           let paisa = Math.round((totalAmount - taka) * 100);
           let words = helper(taka).trim();
           if (words) words += ' Taka'; else words = '';
-          if (paisa > 0) { if (words) words += ' and '; let paisaWords = helper(paisa).trim();
-          if (paisaWords) words += paisaWords + ' Paisa'; else words += `${String(paisa).padStart(2, '0')}/100 Paisa`;
-          }
+          if (paisa > 0) { if (words) words += ' and '; let paisaWords = helper(paisa).trim(); if (paisaWords) words += paisaWords + ' Paisa'; else words += `${String(paisa).padStart(2, '0')}/100 Paisa`; }
           if (words) words += ' Only';
           return words.replace(/\s+/g, ' ').trim() || "Zero Taka Only";
       };
 
-      const monthKey = (dateStr) => { const d = new Date(dateStr);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
-      const nextReceiptNo = (allPayments) => { const yyyymm = monthKey(new Date().toISOString());
-      const prefix = `RC-${yyyymm}-`; const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1; return `${prefix}${String(count).padStart(4, "0")}`; };
+      const monthKey = (dateStr) => { const d = new Date(dateStr); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+      const nextReceiptNo = (allPayments) => { const yyyymm = monthKey(new Date().toISOString()); const prefix = `RC-${yyyymm}-`; const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1; return `${prefix}${String(count).padStart(4, "0")}`; };
       const exportToCSV = (data, filename) => {
           const csvContent = "data:text/csv;charset=utf-8," + data.map(e => e.join(",")).join("\n");
           const encodedUri = encodeURI(csvContent);
@@ -178,6 +158,16 @@
           link.click();
           document.body.removeChild(link);
       };
+      
+      // --- UPDATED WHATSAPP LOGIC ---
+      const createWhatsAppLink = (phone, tenantName, unitName, orgName, dueDay, rent) => { 
+          if (!phone) return null; 
+          const p = phone.replace(/\D/g, ''); 
+          // New Message Format
+          const msg = `*Rent Reminder from ${orgName}*\n\nDear ${tenantName} (Unit: ${unitName}),\n\nYour rent of ${currency(rent)} is due by date ${dueDay}.\nPlease pay on time.\nThank you!`; 
+          return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`; 
+      };
+
       // Receipt Helpers
       function escapeHTML(str) { return String(str || "").replace(/[&<>'"/]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;","/":"&#x2F;"}[c] || c)); }
       function renderReceiptInner(org, payment, unit) { 
@@ -195,9 +185,6 @@
       }; }
       
       const shouldShowReminder = (dueDay) => { const today = new Date(); return Math.abs(today.getDate() - Number(dueDay)) <= 2; }
-      const createWhatsAppLink = (phone, unitName, orgName, dueDay, rent) => { if (!phone) return null;
-      const p = phone.replace(/\D/g, ''); const msg = `*Rent Reminder from ${orgName}*\n\nDear tenant of ${unitName},\n\nYour rent of ${currency(rent)} is due by date ${dueDay}.\nPlease pay on time.\nThank you!`;
-      return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`; };
 
       /* ------------- Initial Data ------------- */
       const initialData = {
@@ -286,7 +273,7 @@
                         legend: { position: 'bottom', labels: { color: document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#475569' } },
                         title: { display: !!title, text: title }
                     },
-                    scales: {
+                    scales: type === 'doughnut' ? {} : {
                         y: { 
                             beginAtZero: true, 
                             grid: { color: document.documentElement.classList.contains('dark') ? '#334155' : '#e2e8f0' },
@@ -302,7 +289,7 @@
             return () => { if (chartRef.current) chartRef.current.destroy(); };
         }, [data, type, title]);
 
-        return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
+        return <div className="w-full h-full"><canvas ref={canvasRef}></canvas></div>;
       };
       const Pagination = ({ totalItems, itemsPerPage, currentPage, setCurrentPage }) => {
         const pages = Math.ceil(totalItems / itemsPerPage);
@@ -516,7 +503,7 @@
             </header>
 
             <main className="mx-auto max-w-6xl p-4 space-y-6 pb-24 md:pb-12 no-print">
-              {tab === "dashboard" && <Dashboard totals={totals} units={data.units} outstanding={outstandingMap} chartData={chartData} />}
+              {tab === "dashboard" && <Dashboard totals={totals} units={data.units} outstanding={outstandingMap} chartData={chartData} expenses={data.expenses} org={data.org} />}
               {tab === "units" && <UnitsSection units={data.units} upsertUnit={upsertUnit} deleteUnit={deleteUnit} />}
               {tab === "payments" && <PaymentsSection payments={data.payments} units={data.units} onRowClick={setShowReceipt} onDelete={(id) => setDeleteRequest({ type: 'payment', id })} />}
               {tab === "newReceipt" && <NewReceiptSection units={data.units} addPayment={addPayment} data={data} />}
@@ -533,40 +520,91 @@
       }
 
       /* ------------- Sub-Sections ------------- */
-      function Dashboard({ totals, units, outstanding, chartData }) {
+      function Dashboard({ totals, units, outstanding, chartData, expenses, org }) {
           const dueCount = Object.values(outstanding).filter(v => v > 0).length;
           const totalDue = Object.values(outstanding).reduce((a,b) => a+b, 0);
           
+          // --- PIE CHART LOGIC ---
+          const expenseCats = {};
+          expenses.forEach(e => { const cat = e.category || "Uncategorized"; expenseCats[cat] = (expenseCats[cat] || 0) + Number(e.amount); });
+          const pieData = { labels: Object.keys(expenseCats), datasets: [{ data: Object.values(expenseCats), backgroundColor: ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#64748b'], borderWidth: 0 }] };
+
+          // --- WHATSAPP REMINDER LOGIC ---
+          const overdueUnits = units.filter(u => {
+              const balance = outstanding[u.id] || 0;
+              if (balance <= 0) return false;
+              if (!u.enableReminder) return false;
+              const today = new Date().getDate();
+              const startRemindingDay = Number(u.dueDay) - 2; 
+              return today >= startRemindingDay;
+          });
+
           return (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-slide-up">
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                       <StatCard label="Total Income" value={currency(totals.income)} icon="💰" color="text-emerald-600" />
                       <StatCard label="Total Expense" value={currency(totals.expense)} icon="📉" color="text-rose-600" />
                       <StatCard label="Net Profit" value={currency(totals.net)} icon="🏦" color="text-indigo-600" />
-                      <StatCard label="Rent Due" value={currency(totalDue)} icon="⚠️" color="text-orange-500" sub={`${dueCount} units`} />
+                      <StatCard label="Total Due" value={currency(totalDue)} icon="⚠️" color="text-orange-500" sub={`${dueCount} units pending`} />
                   </div>
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                          <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4">Financial Trends (6 Months)</h3>
-                          <ChartComponent data={chartData} />
-                      </div>
-                      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-y-auto max-h-80 custom-scrollbar">
-                          <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 sticky top-0 bg-white dark:bg-slate-800">Outstanding Dues</h3>
-                          <div className="space-y-2">
-                              {units.map(u => {
-                                  const due = outstanding[u.id];
-                                  if (due <= 0) return null;
-                                  return (
-                                      <div key={u.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                                          <div>
-                                              <div className="font-medium text-sm">{u.name}</div>
-                                              <div className="text-xs text-slate-500">{u.tenant || "Vacant"}</div>
+                      <div className="lg:col-span-2 space-y-6">
+                          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                              <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2"><span className="bg-indigo-100 dark:bg-indigo-900/50 p-1 rounded text-indigo-600">📊</span> Cash Flow Trend</h3>
+                              <ChartComponent data={chartData} type="bar" />
+                          </div>
+                          
+                          {/* REMINDER CENTER */}
+                          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                              <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center justify-between">
+                                  <div className="flex items-center gap-2"><span className="bg-emerald-100 dark:bg-emerald-900/50 p-1 rounded text-emerald-600">💬</span> Due Reminders</div>
+                                  <span className="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded-full">{overdueUnits.length} To Send</span>
+                              </h3>
+                              <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                  {overdueUnits.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-400 italic text-sm">
+                                        No active reminders.<br/>
+                                        <span className="text-xs opacity-70">(Check if WhatsApp is enabled in Unit settings & due date is near)</span>
+                                    </div>
+                                  ) : (
+                                    overdueUnits.map(u => (
+                                      <div key={u.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg border border-slate-100 dark:border-slate-700">
+                                          <div className="flex items-center gap-3">
+                                              <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center font-bold text-slate-500 text-xs">{u.id}</div>
+                                              <div>
+                                                  <div className="font-bold text-sm text-slate-800 dark:text-slate-200">{u.tenant || "Unknown"}</div>
+                                                  <div className="text-xs text-rose-500 font-mono">Due: {currency(outstanding[u.id])} by {u.dueDay}th</div>
+                                              </div>
                                           </div>
-                                          <div className="text-rose-600 font-bold text-sm">{currency(due)}</div>
+                                          <a href={createWhatsAppLink(u.tenantPhone, u.tenant, u.name, org.name, u.dueDay, outstanding[u.id])} 
+                                             target="_blank" 
+                                             className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm hover:shadow active:scale-95 transition-all">
+                                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.374-5.03c0-5.445 4.431-9.872 9.871-9.872 2.636 0 5.115 1.026 6.979 2.89 1.864 1.864 2.89 4.343 2.89 6.979 0 5.445-4.431 9.872-9.871 9.872z"/></svg>
+                                              Send
+                                          </a>
                                       </div>
-                                  );
-                              })}
-                              {totalDue === 0 && <div className="text-center text-slate-400 py-8">No dues pending! 🎉</div>}
+                                    ))
+                                  )}
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* RIGHT COLUMN: PIE CHART & TOP UNITS */}
+                      <div className="space-y-6">
+                          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 h-80">
+                               <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-2 text-sm flex items-center gap-2"><span className="bg-rose-100 dark:bg-rose-900/50 p-1 rounded text-rose-600">📉</span> Expense Breakdown</h3>
+                              {Object.keys(expenseCats).length > 0 ? <div className="relative h-60"><ChartComponent data={pieData} type="doughnut" /></div> : <div className="h-full flex items-center justify-center text-slate-400 text-xs">No expenses recorded</div>}
+                          </div>
+                          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                              <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3 text-sm">Top Unit Value</h3>
+                              <div className="space-y-3">
+                                  {units.sort((a,b) => b.rent - a.rent).slice(0,3).map((u, i) => (
+                                      <div key={u.id} className="flex items-center justify-between">
+                                          <div className="flex items-center gap-2"><span className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${i===0?'bg-yellow-100 text-yellow-600': 'bg-slate-100 text-slate-500'}`}>{i+1}</span><span className="text-sm text-slate-600 dark:text-slate-300">{u.name}</span></div>
+                                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{currency(u.rent)}</span>
+                                      </div>
+                                  ))}
+                              </div>
                           </div>
                       </div>
                   </div>
