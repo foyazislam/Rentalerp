@@ -159,11 +159,9 @@
           document.body.removeChild(link);
       };
       
-      // --- UPDATED WHATSAPP LOGIC ---
       const createWhatsAppLink = (phone, tenantName, unitName, orgName, dueDay, rent) => { 
           if (!phone) return null; 
           const p = phone.replace(/\D/g, ''); 
-          // New Message Format
           const msg = `*Rent Reminder from ${orgName}*\n\nDear ${tenantName} (Unit: ${unitName}),\n\nYour rent of ${currency(rent)} is due by date ${dueDay}.\nPlease pay on time.\nThank you!`; 
           return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`; 
       };
@@ -399,7 +397,7 @@
         };
 
         const addPayment = (p) => {
-            const newPayment = { ...p, id: crypto.randomUUID() };
+            const newPayment = { ...p, id: crypto.randomUUID(), isPrinted: false }; // Added isPrinted default
             setData(d => ({ ...d, payments: [newPayment, ...d.payments] }));
             addToast(`Receipt ${p.receiptNo} created`);
             syncToSheet({
@@ -427,6 +425,14 @@
               vendor: e.vendor || "",
               notes: e.notes || ""
             });
+        };
+
+        // NEW: Function to mark a payment as printed
+        const markAsPrinted = (id) => {
+          setData(d => ({
+            ...d, 
+            payments: d.payments.map(p => p.id === id ? { ...p, isPrinted: true } : p)
+          }));
         };
 
         const totals = useMemo(() => {
@@ -512,7 +518,7 @@
               {tab === "settings" && <SettingsSection org={data.org} settings={data.settings} updateOrg={updateOrg} updateSettings={updateSettings} data={data} setData={setData} />}
             </main>
 
-            {showReceipt && <ReceiptModal org={data.org} payment={showReceipt} unit={data.units.find(u => u.id === showReceipt.unitId)} onClose={() => setShowReceipt(null)} />}
+            {showReceipt && <ReceiptModal org={data.org} payment={showReceipt} unit={data.units.find(u => u.id === showReceipt.unitId)} onClose={() => setShowReceipt(null)} onPrintMark={() => markAsPrinted(showReceipt.id)} />}
             {(showSettingsPrompt || deleteRequest) && <PasswordPromptModal currentUser={currentUser} isPasswordCorrect={isPasswordCorrect} onClose={() => { setShowSettingsPrompt(false); setDeleteRequest(null); }} onSuccess={() => { if (showSettingsPrompt) { setTab('settings'); setShowSettingsPrompt(false);
             } else if (deleteRequest) { if (deleteRequest.type === 'payment') deletePayment(deleteRequest.id); else if (deleteRequest.type === 'expense') deleteExpense(deleteRequest.id); } }} actionLabel={showSettingsPrompt ? "Access Settings" : "Delete Record"} />}
           </div>
@@ -539,6 +545,12 @@
               return today >= startRemindingDay;
           });
 
+          // --- NEW: UNPAID UNITS LOGIC ---
+          const unpaidUnits = units.filter(u => {
+              const balance = outstanding[u.id] || 0;
+              return balance > 0 && u.tenant; // Has balance and has tenant
+          });
+
           return (
               <div className="space-y-6 animate-slide-up">
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -554,6 +566,35 @@
                               <ChartComponent data={chartData} type="bar" />
                           </div>
                           
+                          {/* NEW: UNPAID STATUS */}
+                          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                                <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center justify-between">
+                                  <div className="flex items-center gap-2"><span className="bg-red-100 dark:bg-red-900/50 p-1 rounded text-red-600">⚠️</span> Unpaid Status (Current Month)</div>
+                                  <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-full">{unpaidUnits.length} Units</span>
+                                </h3>
+                                <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                  {unpaidUnits.length === 0 ? (
+                                    <div className="text-center py-4 text-emerald-500 text-sm font-medium">All tenants have paid! 🎉</div>
+                                  ) : (
+                                    unpaidUnits.map(u => (
+                                      <div key={u.id} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800">
+                                          <div className="flex items-center gap-3">
+                                              <div className="h-8 w-8 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shadow-sm">{u.id}</div>
+                                              <div>
+                                                  <div className="font-bold text-sm text-slate-800 dark:text-slate-200">{u.tenant || "Unknown"}</div>
+                                                  <div className="text-xs text-slate-500">Rent: {currency(u.rent)}</div>
+                                              </div>
+                                          </div>
+                                          <div className="text-right">
+                                             <div className="text-sm font-bold text-red-600">Due: {currency(outstanding[u.id])}</div>
+                                             <div className="text-xs text-slate-400">by {u.dueDay}th</div>
+                                          </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                          </div>
+
                           {/* REMINDER CENTER */}
                           <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                               <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center justify-between">
@@ -717,7 +758,11 @@
                                   <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
                                       <td className="p-3 text-center text-xs text-slate-400">{(currentPage - 1) * itemsPerPage + i + 1}</td>
                                       <td className="p-3 whitespace-nowrap text-slate-500">{formatDisplayDate(p.date)}</td>
-                                      <td className="p-3 font-mono text-xs">{p.receiptNo}</td>
+                                      <td className="p-3 font-mono text-xs">
+                                        {p.receiptNo}
+                                        {/* NEW: Print Indicator */}
+                                        {p.isPrinted && <span className="ml-2 text-emerald-500 text-xs" title="Printed">✓✓</span>}
+                                      </td>
                                       <td className="p-3">
                                           <div className="font-medium">{p.tenant}</div>
                                           <div className="text-xs text-slate-400">{units.find(u => u.id === p.unitId)?.name} • {formatMonth(p.forMonth)}</div>
@@ -1056,9 +1101,17 @@
           );
       }
 
-      function ReceiptModal({ org, payment, unit, onClose }) {
+      // MODIFIED: Accepts onPrintMark callback
+      function ReceiptModal({ org, payment, unit, onClose, onPrintMark }) {
         const ref = useRef();
-        const printNow = () => { const w = window.open("", "_blank"); w.document.write(renderReceiptHTML(org, payment, unit)); w.document.close(); w.focus(); setTimeout(() => w.print(), 200); };
+        const printNow = () => { 
+            const w = window.open("", "_blank"); 
+            w.document.write(renderReceiptHTML(org, payment, unit)); 
+            w.document.close(); 
+            w.focus(); 
+            onPrintMark(); // Mark as printed in database
+            setTimeout(() => w.print(), 200); 
+        };
         return ( <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm"> <div ref={ref} className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95"> <div className="p-4 border-b flex items-center justify-between"> <h3 className="font-bold text-lg text-slate-900">Receipt #{payment.receiptNo}</h3> <div className="flex gap-2"> <Button variant="primary" onClick={printNow}>🖨️ Print</Button> <Button variant="secondary" onClick={onClose}>Close</Button> </div> </div> <div className="p-6 overflow-y-auto bg-slate-100 flex-1 flex items-center justify-center"> <div className="bg-white shadow-lg w-full max-w-[100%]" dangerouslySetInnerHTML={{ __html: renderReceiptInner(org, payment, unit) }} /> </div> </div> </div> );
       }
       
