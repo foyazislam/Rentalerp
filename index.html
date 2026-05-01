@@ -471,7 +471,7 @@
             const now = new Date();
             const ym = monthKey(now.toISOString());
             const map = {};
-            data.units.forEach(u => map[u.id] = u.rent || 0);
+            data.units.forEach(u => map[u.id] = Number(u.rent) || 0);
             data.payments.filter(p => (p.forMonth || "").startsWith(ym)).forEach(p => { map[p.unitId] = Math.max(0, (map[p.unitId] || 0) - Number(p.amount || 0)); });
             return map;
         }, [data.units, data.payments]);
@@ -528,7 +528,7 @@
       /* ------------- Sub-Sections ------------- */
       function Dashboard({ totals, units, outstanding, chartData, expenses, org }) {
           const dueCount = Object.values(outstanding).filter(v => v > 0).length;
-          const totalDue = Object.values(outstanding).reduce((a,b) => a+b, 0);
+          const totalDue = Object.values(outstanding).reduce((a,b) => a + Number(b), 0);
           
           // --- PIE CHART LOGIC ---
           const expenseCats = {};
