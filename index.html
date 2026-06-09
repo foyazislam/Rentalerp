@@ -173,7 +173,6 @@
           return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`; 
       };
 
-      // EXACT ORIGINAL RECEIPT INNER SIZING & STYLING
       function escapeHTML(str) { return String(str || "").replace(/[&<>'"/]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;","/":"&#x2F;"}[c] || c)); }
       function renderReceiptInner(org, payment, unit) { 
           const unitName = unit?.name || payment.unitId || "N/A"; 
@@ -183,7 +182,6 @@
           return ` <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 20px; background: white; border: 1px solid #ddd;"> <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;"> <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1> <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)}</p> </div> <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2> <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;"> <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span> <span><b>Date:</b> ${escapeHTML(displayDate)}</span> </div> <table style="width:100%; font-size:14px; border-collapse: collapse;"> <tr><td style="padding:4px 0;"><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td></tr> <tr> <td style="padding:4px 0;"><b>For Unit No:</b> ${escapeHTML(unitName)}</td> <td style="padding:4px 0;"><b>Purpose:</b> ${escapeHTML(displayPurpose)}</td> </tr> <tr> <td style="padding:4px 0;"><b>For The Month:</b> ${escapeHTML(formattedMonth)}</td> <td style="padding:4px 0;"><b>Method:</b> ${escapeHTML(payment.method)}</td> </tr> <tr> <td style="padding:4px 0;"><b>In Words:</b> ${amountToWords(payment.amount)}</td> <td style="padding:4px 0;"><b>Amount:</b> <b style="font-size:16px;">${currency(payment.amount)}</b></td> </tr> </table> ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""} <div style="height:30px;"></div> <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;"> <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div> <div style="margin-right:10px;"><div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px; text-align:center;">Authorized Signature</div></div> </div> </div> `;
       }
       
-      // CENTERING THE CUT LINE LOGIC
       function renderReceiptHTML(org, payment, unit) { return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Receipt</title><style>@media print{@page{size:A4 portrait;margin:0}body{margin:0!important;padding:0!important}.sheet{height:98mm;width:100%;box-sizing:border-box;page-break-inside:avoid;border-bottom:1px dashed #ccc;display:flex;align-items:center;justify-content:center}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;max-width:210mm;display:flex;align-items:center;justify-content:center;border-bottom:1px dashed #ccc}</style></head><body><div class="sheet"><div style="width:100%;">${renderReceiptInner(org, payment, unit)}</div></div></body></html>`; }
 
       const classNames = (...c) => c.filter(Boolean).join(" ");
@@ -195,7 +193,7 @@
         org: { name: "Shahjahan Chowdhury Bari", address: "Bashundhara R/A, Dhaka-1230", phone: "+8801749333661", email: "info@example.com", note: "Thank you for your payment!", },
         settings: { theme: 'indigo', darkMode: false, backupUrl: "" },
         units: [ ...Array.from({ length: 5 }).map((_, i) => ({ id: `F${i + 1}`, type: "Flat", name: `Flat ${i + 1}`, rent: 15000, 
-        dueDay: 5, tenant: "", tenantPhone: "", enableReminder: true })), ],
+        dueDay: 5, tenant: "", tenantPhone: "", enableReminder: true, assignDate: todayStr() })), ],
         payments: [], expenses: [], otherIncomes: []
       };
 
@@ -344,6 +342,7 @@
         const [loading, setLoading] = useState(true);
         const [deleteRequest, setDeleteRequest] = useState(null);
         const [showSettingsPrompt, setShowSettingsPrompt] = useState(false);
+        const [dueMonth, setDueMonth] = useState(() => monthKey(new Date().toISOString()));
         const { addToast } = useToast();
         const uid = currentUser?.uid;
 
@@ -435,13 +434,20 @@
             return { labels, datasets: [ { label: 'Income', data: incomeData, backgroundColor: '#6366f1', borderRadius: 8 }, { label: 'Expense', data: expenseData, backgroundColor: '#f43f5e', borderRadius: 8 } ] };
         }, [data.payments, data.expenses, data.otherIncomes]);
 
+        // Fix outstanding map to also be perfectly safe with unitId or unitName
         const outstandingMap = useMemo(() => {
-            const ym = monthKey(new Date().toISOString());
+            const ym = dueMonth;
             const map = {};
             data.units.forEach(u => map[u.id] = Number(u.rent) || 0);
-            data.payments.filter(p => (p.forMonth || "").startsWith(ym)).forEach(p => { map[p.unitId] = Math.max(0, (map[p.unitId] || 0) - Number(p.amount || 0)); });
+            data.payments.filter(p => (p.forMonth || "").startsWith(ym)).forEach(p => { 
+                let uId = p.unitId;
+                const matchedUnitByName = data.units.find(u => u.name === p.unitId);
+                if (matchedUnitByName) uId = matchedUnitByName.id;
+                
+                map[uId] = Math.max(0, (map[uId] || 0) - Number(p.amount || 0)); 
+            });
             return map;
-        }, [data.units, data.payments]);
+        }, [data.units, data.payments, dueMonth]);
         
         if (loading) return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-[#f5f5f7] dark:bg-[#000000] gap-5">
@@ -465,7 +471,7 @@
               </div>
               <nav className="mx-auto max-w-6xl px-4 overflow-x-auto custom-scrollbar">
                 <div className="flex gap-2 pb-4 min-w-max">
-                   {[ ["dashboard", "Dashboard"], ["units", "Units"], ["payments", "History"], ["newReceipt", "+ Receipt"], ["otherIncomes", "Other Income"], ["statement", "Statement"], ["expenses", "Expenses"], ["settings", "Settings"] ].map(([key, label]) => (
+                   {[ ["dashboard", "Dashboard"], ["units", "Units"], ["payments", "History"], ["previousDues", "Previous Dues"], ["newReceipt", "+ Receipt"], ["otherIncomes", "Other Income"], ["statement", "Statement"], ["expenses", "Expenses"], ["settings", "Settings"] ].map(([key, label]) => (
                       <button key={key} onClick={() => { if (key === 'settings' && currentUser) setShowSettingsPrompt(true); else setTab(key); }}
                       className={classNames("px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-300 whitespace-nowrap", tab === key ? "bg-slate-900 text-white dark:bg-white dark:text-black shadow-md" : "text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/10")}>
                       {label}
@@ -476,9 +482,10 @@
             </header>
 
             <main className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8 space-y-8 pb-32 md:pb-16 no-print">
-              {tab === "dashboard" && <Dashboard totals={totals} units={data.units} outstanding={outstandingMap} chartData={chartData} expenses={data.expenses} org={data.org} />}
+              {tab === "dashboard" && <Dashboard totals={totals} units={data.units} outstanding={outstandingMap} chartData={chartData} expenses={data.expenses} org={data.org} dueMonth={dueMonth} setDueMonth={setDueMonth} />}
               {tab === "units" && <UnitsSection units={data.units} upsertUnit={upsertUnit} deleteUnit={deleteUnit} />}
               {tab === "payments" && <PaymentsSection payments={data.payments} units={data.units} org={data.org} onRowClick={setShowReceipt} onDelete={(id) => setDeleteRequest({ type: 'payment', id })} onPrintBulk={(ids) => { setData(d => ({ ...d, payments: d.payments.map(p => ids.includes(p.id) ? { ...p, isPrinted: true } : p) })); }} />}
+              {tab === "previousDues" && <PreviousDuesSection units={data.units} payments={data.payments} org={data.org} />}
               {tab === "newReceipt" && <NewReceiptSection units={data.units} addPayment={addPayment} data={data} />}
               {tab === "otherIncomes" && <OtherIncomesSection incomes={data.otherIncomes || []} addIncome={addOtherIncome} onDelete={(id) => setDeleteRequest({ type: 'otherIncome', id })} />}
               {tab === "statement" && <Section title="Financial Statement"><StatementView payments={data.payments} expenses={data.expenses} otherIncomes={data.otherIncomes || []} org={data.org} /></Section>}
@@ -496,7 +503,110 @@
       }
 
       /* ------------- Sub-Sections ------------- */
-      function Dashboard({ totals, units, outstanding, chartData, expenses, org }) {
+      
+      function PreviousDuesSection({ units, payments, org }) {
+          const currentYm = monthKey(todayStr());
+          
+          const duesList = useMemo(() => {
+              return units.map(u => {
+                  if (!u.tenant) return null; // Ignore vacant units
+                  
+                  let startMonth;
+                  if (u.assignDate) {
+                      startMonth = monthKey(u.assignDate);
+                  } else {
+                      // Fallback: strictly matching Unit ID (or Unit Name for legacy safety)
+                      const unitPayments = payments.filter(p => (p.unitId === u.id || p.unitId === u.name) && p.forMonth);
+                      if (unitPayments.length === 0) return null;
+                      const monthsWithPayments = unitPayments.map(p => p.forMonth).sort();
+                      startMonth = monthsWithPayments[0];
+                  }
+                  
+                  if (!startMonth) return null;
+
+                  let pastDueTotal = 0;
+                  const missedMonths = [];
+                  
+                  let curr = new Date(startMonth + "-01");
+                  const end = new Date(currentYm + "-01");
+                  
+                  // Scan from assignment date up to the PREVIOUS month
+                  while (curr < end) {
+                      const ym = monthKey(curr.toISOString());
+                      
+                      // Calculate the exact due strictly by UNIT, ignoring tenant mismatch
+                      const paid = payments.filter(p => (p.unitId === u.id || p.unitId === u.name) && p.forMonth === ym)
+                                           .reduce((sum, p) => sum + Number(p.amount), 0);
+                                           
+                      const due = Math.max(0, Number(u.rent) - paid);
+                      
+                      if (due > 0) {
+                          pastDueTotal += due;
+                          missedMonths.push({ month: ym, due });
+                      }
+                      
+                      curr.setMonth(curr.getMonth() + 1);
+                  }
+                  
+                  if (missedMonths.length > 0) {
+                      return { unit: u, pastDueTotal, missedMonths };
+                  }
+                  return null;
+              }).filter(Boolean);
+          }, [units, payments, currentYm]);
+
+          return (
+              <div className="space-y-8 animate-slide-up">
+                  <Section title="Previous Dues (Unpaid Past Months)">
+                      {duesList.length === 0 ? (
+                          <div className="text-center py-12 text-emerald-500 font-bold bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl border border-emerald-100 dark:border-emerald-500/20 shadow-sm">
+                              All active units are cleared for past months! 🎉
+                          </div>
+                      ) : (
+                          <div className="grid gap-4">
+                              {duesList.map(item => (
+                                  <div key={item.unit.id} className="p-6 bg-white/50 dark:bg-[#2c2c2e]/50 rounded-[2rem] border border-rose-100 dark:border-rose-900/30 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition-transform hover:scale-[1.01]">
+                                      <div className="flex items-center gap-4">
+                                          <div className="h-12 w-12 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center font-bold text-rose-600 dark:text-rose-400 text-lg shadow-inner">
+                                              {item.unit.id}
+                                          </div>
+                                          <div>
+                                              {/* Flipped hierarchy: Unit Name is now the primary header */}
+                                              <div className="font-black text-lg text-slate-900 dark:text-white">{item.unit.name}</div>
+                                              <div className="text-sm font-medium text-slate-500">Tenant: <span className="font-bold">{item.unit.tenant}</span> • Rent: {currency(item.unit.rent)}</div>
+                                          </div>
+                                      </div>
+                                      
+                                      <div className="flex-1 md:px-6">
+                                          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Missed Months ({item.missedMonths.length})</div>
+                                          <div className="flex flex-wrap gap-2">
+                                              {item.missedMonths.map(m => (
+                                                  <span key={m.month} className="px-3 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg border border-rose-100 dark:border-rose-500/20 shadow-sm">
+                                                      {formatMonth(m.month)}: {currency(m.due)}
+                                                  </span>
+                                              ))}
+                                          </div>
+                                      </div>
+
+                                      <div className="text-right flex flex-col items-start md:items-end gap-3 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-black/5 dark:border-white/5">
+                                          <div>
+                                              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 md:text-right">Total Past Due</div>
+                                              <div className="text-2xl font-black text-rose-600 tracking-tight">{currency(item.pastDueTotal)}</div>
+                                          </div>
+                                          <a href={createWhatsAppLink(item.unit.tenantPhone, item.unit.tenant, item.unit.name, org.name, item.unit.dueDay, item.pastDueTotal)} target="_blank" className="bg-[#25D366] hover:bg-[#1DA851] text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-[0_4px_12px_rgba(37,211,102,0.3)] active:scale-95 transition-all w-full justify-center md:w-auto">
+                                              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.374-5.03c0-5.445 4.431-9.872 9.871-9.872 2.636 0 5.115 1.026 6.979 2.89 1.864 1.864 2.89 4.343 2.89 6.979 0 5.445-4.431 9.872-9.871 9.872z"/></svg> Remind Past Due
+                                          </a>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </Section>
+              </div>
+          );
+      }
+
+      function Dashboard({ totals, units, outstanding, chartData, expenses, org, dueMonth, setDueMonth }) {
           const dueCount = Object.values(outstanding).filter(v => v > 0).length;
           const totalDue = Object.values(outstanding).reduce((a,b) => a + Number(b), 0);
           
@@ -504,7 +614,13 @@
           expenses.forEach(e => { const cat = e.category || "Uncategorized"; expenseCats[cat] = (expenseCats[cat] || 0) + Number(e.amount); });
           const pieData = { labels: Object.keys(expenseCats), datasets: [{ data: Object.values(expenseCats), backgroundColor: ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#64748b'], borderWidth: 0, hoverOffset: 4 }] };
           
-          const overdueUnits = units.filter(u => { const bal = outstanding[u.id] || 0; return bal > 0 && u.enableReminder && new Date().getDate() >= (Number(u.dueDay) - 2); });
+          const currentYm = monthKey(new Date().toISOString());
+          const overdueUnits = units.filter(u => { 
+              const bal = outstanding[u.id] || 0; 
+              if (bal <= 0 || !u.enableReminder || !u.tenant) return false;
+              if (dueMonth < currentYm) return true;
+              return new Date().getDate() >= (Number(u.dueDay) - 2); 
+          });
           const unpaidUnits = units.filter(u => (outstanding[u.id] || 0) > 0 && u.tenant);
           
           return (
@@ -513,7 +629,7 @@
                       <StatCard label="Total Income" value={currency(totals.income)} icon="􀖀" color="text-emerald-500" />
                       <StatCard label="Total Expense" value={currency(totals.expense)} icon="􀢒" color="text-rose-500" />
                       <StatCard label="Net Profit" value={currency(totals.net)} icon="􀤆" color="text-indigo-500" />
-                      <StatCard label="Total Due" value={currency(totalDue)} icon="􀇿" color="text-amber-500" sub={`${dueCount} pending`} />
+                      <StatCard label="Total Due" value={currency(totalDue)} icon="􀇿" color="text-amber-500" sub={`${dueCount} pending for ${formatMonth(dueMonth)}`} />
                   </div>
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                       <div className="lg:col-span-2 space-y-8">
@@ -521,18 +637,18 @@
                               <ChartComponent data={chartData} type="bar" />
                           </Section>
                           
-                          <Section title="Unpaid Status">
+                          <Section title="Unpaid Status" right={<Input type="month" value={dueMonth} onChange={e => setDueMonth(e.target.value)} className="w-40 !py-2 !rounded-full text-sm" />}>
                                 <div className="space-y-3 max-h-72 overflow-y-auto custom-scrollbar pr-3">
                                   {unpaidUnits.length === 0 ? (
-                                    <div className="text-center py-10 text-emerald-500 text-sm font-bold bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl">All tenants have paid! 🎉</div>
+                                    <div className="text-center py-10 text-emerald-500 text-sm font-bold bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl">All tenants have paid for {formatMonth(dueMonth)}! 🎉</div>
                                   ) : (
                                     unpaidUnits.map(u => (
                                       <div key={u.id} className="flex items-center justify-between p-4 bg-white/50 dark:bg-[#2c2c2e]/50 rounded-2xl border border-rose-100 dark:border-rose-900/30 shadow-sm transition-transform hover:scale-[1.01]">
                                           <div className="flex items-center gap-4">
                                               <div className="h-10 w-10 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center font-bold text-rose-600 dark:text-rose-400 text-sm">{u.id}</div>
                                               <div>
-                                                  <div className="font-bold text-base text-slate-900 dark:text-white">{u.tenant || "Unknown"}</div>
-                                                  <div className="text-xs font-medium text-slate-500">Rent: {currency(u.rent)}</div>
+                                                  <div className="font-bold text-base text-slate-900 dark:text-white">{u.name}</div>
+                                                  <div className="text-xs font-medium text-slate-500">Tenant: {u.tenant || "Unknown"} • {formatMonth(dueMonth)}</div>
                                               </div>
                                           </div>
                                           <div className="text-right">
@@ -606,9 +722,18 @@
                               <Input type="number" placeholder="Due Day" value={form.dueDay||""} onChange={e => setForm({...form, dueDay: e.target.value})} />
                           </div>
                           <div className="h-px bg-black/5 dark:bg-white/5 my-2 w-full rounded-full"></div>
-                          <Input placeholder="Tenant Name" value={form.tenant||""} onChange={e => setForm({...form, tenant: e.target.value})} />
-                          <Input placeholder="Tenant Phone" value={form.tenantPhone||""} onChange={e => setForm({...form, tenantPhone: e.target.value})} />
-                          <div className="px-1"><Checkbox id="remind" label="WhatsApp Reminders" checked={!!form.enableReminder} onChange={e => setForm({...form, enableReminder: e.target.checked})} /></div>
+                          
+                          <div className="bg-black/5 dark:bg-white/5 p-4 rounded-2xl space-y-3 border border-black/5 dark:border-white/5">
+                              <div className="text-[10px] font-extrabold tracking-wider text-slate-500 uppercase mb-1">Tenant Details</div>
+                              <Input placeholder="Tenant Name" value={form.tenant||""} onChange={e => setForm({...form, tenant: e.target.value})} className="bg-white dark:bg-[#1c1c1e]" />
+                              <Input placeholder="Tenant Phone" value={form.tenantPhone||""} onChange={e => setForm({...form, tenantPhone: e.target.value})} className="bg-white dark:bg-[#1c1c1e]" />
+                              <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 pl-1">Assigning Date</label>
+                                  <Input type="date" value={form.assignDate||""} onChange={e => setForm({...form, assignDate: e.target.value})} className="bg-white dark:bg-[#1c1c1e]" />
+                              </div>
+                              <div className="px-1 pt-1"><Checkbox id="remind" label="WhatsApp Reminders" checked={!!form.enableReminder} onChange={e => setForm({...form, enableReminder: e.target.checked})} /></div>
+                          </div>
+
                           {form.id && ( <div className="grid grid-cols-3 gap-3 mt-4"> <FileUpload label="Photo" urlKey="tenantPhoto" unitId={form.id} setUnitForm={setForm} currentUrl={form.tenantPhotoUrl} /> <FileUpload label="NID" urlKey="tenantNid" unitId={form.id} setUnitForm={setForm} currentUrl={form.tenantNidUrl} /> <FileUpload label="Deed" urlKey="rentAgreement" unitId={form.id} setUnitForm={setForm} currentUrl={form.rentAgreementUrl} /> </div> )}
                           <div className="flex gap-3 pt-4">
                               <Button className="flex-1 py-3.5" onClick={() => { if(!form.id) return; upsertUnit(form); setForm({}); }}>{form.id ? "Update Unit" : "Save Unit"}</Button>
@@ -627,7 +752,7 @@
                                   {filtered.map(u => (
                                       <tr key={u.id} className="group hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
                                           <td className="py-4 pl-2"><div className="font-bold text-base text-slate-900 dark:text-white">{u.name}</div><div className="text-xs font-medium text-slate-500">{u.type} • {u.id}</div></td>
-                                          <td className="py-4">{u.tenant ? <div><div className="font-bold text-slate-800 dark:text-slate-200">{u.tenant}</div><div className="text-xs font-medium text-slate-500">{u.tenantPhone}</div></div> : <span className="px-2 py-1 bg-slate-100 dark:bg-[#3a3a3c] rounded-md text-slate-500 text-xs font-bold">Vacant</span>}</td>
+                                          <td className="py-4">{u.tenant ? <div><div className="font-bold text-slate-800 dark:text-slate-200">{u.tenant}</div><div className="text-xs font-medium text-slate-500">{u.tenantPhone} {u.assignDate ? ` • Since ${formatDisplayDate(u.assignDate)}` : ''}</div></div> : <span className="px-2 py-1 bg-slate-100 dark:bg-[#3a3a3c] rounded-md text-slate-500 text-xs font-bold">Vacant</span>}</td>
                                           <td className="py-4 text-right font-black text-slate-900 dark:text-white tracking-tight">{currency(u.rent)}</td>
                                           <td className="py-4 text-right pr-2"><Button variant="ghost" className="!p-2 hover:bg-black/5 dark:hover:bg-white/10" onClick={() => setForm(u)}>Edit</Button></td>
                                       </tr>
@@ -661,8 +786,6 @@
           
           useEffect(() => setCurrentPage(1), [search, monthFilter]);
 
-          // Cleaned up the CSS completely: @page margin is 0, height is 98mm (98*3 = 294mm). 
-          // The flexbox vertically centers the receipt EXACTLY between the 98mm container walls, putting the border right in the middle!
           const handlePrintSelected = () => {
               if (selectedReceipts.length === 0) return;
               const receiptsToPrint = payments.filter(p => selectedReceipts.includes(p.id));
