@@ -173,7 +173,7 @@
           return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`; 
       };
 
-      // Receipt Helpers
+      // EXACT ORIGINAL RECEIPT INNER SIZING & STYLING
       function escapeHTML(str) { return String(str || "").replace(/[&<>'"/]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;","/":"&#x2F;"}[c] || c)); }
       function renderReceiptInner(org, payment, unit) { 
           const unitName = unit?.name || payment.unitId || "N/A"; 
@@ -182,7 +182,9 @@
           const displayPurpose = (payment.purpose === "Rent" || !payment.purpose) ? "Rent And Service Charge" : payment.purpose;
           return ` <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 20px; background: white; border: 1px solid #ddd;"> <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;"> <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1> <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)}</p> </div> <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2> <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;"> <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span> <span><b>Date:</b> ${escapeHTML(displayDate)}</span> </div> <table style="width:100%; font-size:14px; border-collapse: collapse;"> <tr><td style="padding:4px 0;"><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td></tr> <tr> <td style="padding:4px 0;"><b>For Unit No:</b> ${escapeHTML(unitName)}</td> <td style="padding:4px 0;"><b>Purpose:</b> ${escapeHTML(displayPurpose)}</td> </tr> <tr> <td style="padding:4px 0;"><b>For The Month:</b> ${escapeHTML(formattedMonth)}</td> <td style="padding:4px 0;"><b>Method:</b> ${escapeHTML(payment.method)}</td> </tr> <tr> <td style="padding:4px 0;"><b>In Words:</b> ${amountToWords(payment.amount)}</td> <td style="padding:4px 0;"><b>Amount:</b> <b style="font-size:16px;">${currency(payment.amount)}</b></td> </tr> </table> ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""} <div style="height:30px;"></div> <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;"> <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div> <div style="margin-right:10px;"><div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px; text-align:center;">Authorized Signature</div></div> </div> </div> `;
       }
-      function renderReceiptHTML(org, payment, unit) { return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Receipt</title><style>@media print{@page{size:A4 portrait;margin:0}body{margin:0!important}.sheet{height:98mm;width:100%;padding:5mm;box-sizing:border-box;page-break-inside:avoid;border-bottom:1px dashed #ccc}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;padding:10px;max-width:210mm;}</style></head><body><div class="sheet">${renderReceiptInner(org, payment, unit)}</div></body></html>`; }
+      
+      // CENTERING THE CUT LINE LOGIC
+      function renderReceiptHTML(org, payment, unit) { return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Receipt</title><style>@media print{@page{size:A4 portrait;margin:0}body{margin:0!important;padding:0!important}.sheet{height:98mm;width:100%;box-sizing:border-box;page-break-inside:avoid;border-bottom:1px dashed #ccc;display:flex;align-items:center;justify-content:center}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;max-width:210mm;display:flex;align-items:center;justify-content:center;border-bottom:1px dashed #ccc}</style></head><body><div class="sheet"><div style="width:100%;">${renderReceiptInner(org, payment, unit)}</div></div></body></html>`; }
 
       const classNames = (...c) => c.filter(Boolean).join(" ");
       if (!(window.crypto && window.crypto.randomUUID)) { window.crypto = window.crypto || {};
@@ -476,7 +478,7 @@
             <main className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8 space-y-8 pb-32 md:pb-16 no-print">
               {tab === "dashboard" && <Dashboard totals={totals} units={data.units} outstanding={outstandingMap} chartData={chartData} expenses={data.expenses} org={data.org} />}
               {tab === "units" && <UnitsSection units={data.units} upsertUnit={upsertUnit} deleteUnit={deleteUnit} />}
-              {tab === "payments" && <PaymentsSection payments={data.payments} units={data.units} onRowClick={setShowReceipt} onDelete={(id) => setDeleteRequest({ type: 'payment', id })} />}
+              {tab === "payments" && <PaymentsSection payments={data.payments} units={data.units} org={data.org} onRowClick={setShowReceipt} onDelete={(id) => setDeleteRequest({ type: 'payment', id })} onPrintBulk={(ids) => { setData(d => ({ ...d, payments: d.payments.map(p => ids.includes(p.id) ? { ...p, isPrinted: true } : p) })); }} />}
               {tab === "newReceipt" && <NewReceiptSection units={data.units} addPayment={addPayment} data={data} />}
               {tab === "otherIncomes" && <OtherIncomesSection incomes={data.otherIncomes || []} addIncome={addOtherIncome} onDelete={(id) => setDeleteRequest({ type: 'otherIncome', id })} />}
               {tab === "statement" && <Section title="Financial Statement"><StatementView payments={data.payments} expenses={data.expenses} otherIncomes={data.otherIncomes || []} org={data.org} /></Section>}
@@ -638,24 +640,96 @@
           );
       }
 
-      function PaymentsSection({ payments, units, onRowClick, onDelete }) {
-          const [search, setSearch] = useState(""); const [monthFilter, setMonthFilter] = useState(""); const [currentPage, setCurrentPage] = useState(1); const itemsPerPage = 10;
-          const filtered = useMemo(() => { let res = payments; if (monthFilter) res = res.filter(p => (p.forMonth || "").startsWith(monthFilter)); if (search) { const q = search.toLowerCase(); res = res.filter(p => p.receiptNo.toLowerCase().includes(q) || p.tenant.toLowerCase().includes(q)); } return res.sort((a,b) => new Date(b.date) - new Date(a.date)); }, [payments, search, monthFilter]);
+      function PaymentsSection({ payments, units, org, onRowClick, onDelete, onPrintBulk }) {
+          const [search, setSearch] = useState(""); 
+          const [monthFilter, setMonthFilter] = useState(""); 
+          const [currentPage, setCurrentPage] = useState(1); 
+          const [selectedReceipts, setSelectedReceipts] = useState([]);
+          const itemsPerPage = 10;
+
+          const filtered = useMemo(() => { 
+              let res = payments; 
+              if (monthFilter) res = res.filter(p => (p.forMonth || "").startsWith(monthFilter)); 
+              if (search) { 
+                  const q = search.toLowerCase(); 
+                  res = res.filter(p => p.receiptNo.toLowerCase().includes(q) || p.tenant.toLowerCase().includes(q)); 
+              } 
+              return res.sort((a,b) => new Date(b.date) - new Date(a.date)); 
+          }, [payments, search, monthFilter]);
+          
           const paginated = useMemo(() => filtered.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage), [filtered, currentPage]);
+          
           useEffect(() => setCurrentPage(1), [search, monthFilter]);
+
+          // Cleaned up the CSS completely: @page margin is 0, height is 98mm (98*3 = 294mm). 
+          // The flexbox vertically centers the receipt EXACTLY between the 98mm container walls, putting the border right in the middle!
+          const handlePrintSelected = () => {
+              if (selectedReceipts.length === 0) return;
+              const receiptsToPrint = payments.filter(p => selectedReceipts.includes(p.id));
+
+              let combinedHtml = `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Bulk Print Receipts</title><style>@media print{@page{size:A4 portrait;margin:0}body{margin:0!important;padding:0!important}.sheet{height:98mm;width:100%;box-sizing:border-box;page-break-inside:avoid;border-bottom:1.5px dashed #888;display:flex;align-items:center;justify-content:center}.sheet:nth-child(3n){border-bottom:none;page-break-after:always}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;padding:15px;max-width:210mm;border-bottom:1.5px dashed #ccc;display:flex;align-items:center;justify-content:center}</style></head><body>`;
+
+              receiptsToPrint.forEach(payment => {
+                  const unit = units.find(u => u.id === payment.unitId);
+                  combinedHtml += `<div class="sheet"><div style="width:100%;">${renderReceiptInner(org, payment, unit)}</div></div>`;
+              });
+
+              combinedHtml += `</body></html>`;
+
+              const w = window.open("", "_blank");
+              w.document.write(combinedHtml);
+              w.document.close();
+              w.focus();
+
+              if (onPrintBulk) onPrintBulk(selectedReceipts);
+
+              setTimeout(() => { w.print(); setSelectedReceipts([]); }, 200);
+          };
+
+          const toggleSelectAll = (e) => {
+              if (e.target.checked) {
+                  setSelectedReceipts(paginated.map(p => p.id));
+              } else {
+                  setSelectedReceipts([]);
+              }
+          };
+
+          const toggleSelect = (id) => {
+              setSelectedReceipts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+          };
           
           return (
-              <Section title="Receipt History" right={<div className="flex gap-3"><Input type="month" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} className="w-40 !py-2 !rounded-full text-sm" /><Button variant="secondary" className="!py-2 !rounded-full text-xs" onClick={() => exportToCSV([["Date", "Receipt No", "Unit", "Tenant", "Month", "Amount", "Method"], ...filtered.map(p => [p.date, p.receiptNo, p.unitId, p.tenant, p.forMonth, p.amount, p.method])], `payments_${todayStr()}.csv`)}>⬇ CSV</Button></div>}>
+              <Section title="Receipt History" right={
+                  <div className="flex gap-3 items-center">
+                      {selectedReceipts.length > 0 && (
+                          <Button onClick={handlePrintSelected} className="!py-2 !rounded-full text-xs !bg-emerald-600 hover:!bg-emerald-500">
+                              Print Selected ({selectedReceipts.length})
+                          </Button>
+                      )}
+                      <Input type="month" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} className="w-40 !py-2 !rounded-full text-sm" />
+                      <Button variant="secondary" className="!py-2 !rounded-full text-xs" onClick={() => exportToCSV([["Date", "Receipt No", "Unit", "Tenant", "Month", "Amount", "Method"], ...filtered.map(p => [p.date, p.receiptNo, p.unitId, p.tenant, p.forMonth, p.amount, p.method])], `payments_${todayStr()}.csv`)}>⬇ CSV</Button>
+                  </div>
+              }>
                   <div className="mb-6"><Input placeholder="Search by receipt or tenant..." value={search} onChange={e => setSearch(e.target.value)} className="!rounded-2xl" /></div>
                   <div className="overflow-x-auto">
                       <table className="min-w-full text-sm whitespace-nowrap">
                           <thead className="text-left text-slate-400 font-bold border-b border-black/5 dark:border-white/5">
-                              <tr><th className="pb-4 w-10 text-center">#</th><th className="pb-4">Date & Receipt</th><th className="pb-4">Tenant & Unit</th><th className="pb-4 text-right">Amount</th><th className="pb-4 text-center">Action</th></tr>
+                              <tr>
+                                  <th className="pb-4 w-10 text-center">
+                                      <input type="checkbox" onChange={toggleSelectAll} checked={paginated.length > 0 && selectedReceipts.length === paginated.length} className="cursor-pointer h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                                  </th>
+                                  <th className="pb-4">Date & Receipt</th>
+                                  <th className="pb-4">Tenant & Unit</th>
+                                  <th className="pb-4 text-right">Amount</th>
+                                  <th className="pb-4 text-center">Action</th>
+                              </tr>
                           </thead>
                           <tbody className="divide-y divide-black/5 dark:divide-white/5">
                               {paginated.map((p, i) => (
                                   <tr key={p.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
-                                      <td className="py-4 text-center text-xs font-bold text-slate-400">{(currentPage - 1) * itemsPerPage + i + 1}</td>
+                                      <td className="py-4 text-center">
+                                          <input type="checkbox" checked={selectedReceipts.includes(p.id)} onChange={() => toggleSelect(p.id)} className="cursor-pointer h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                                      </td>
                                       <td className="py-4"><div className="font-medium text-slate-900 dark:text-white">{formatDisplayDate(p.date)}</div><div className="text-xs font-mono font-bold text-indigo-500">{p.receiptNo} {p.isPrinted && <span title="Printed">✓</span>}</div></td>
                                       <td className="py-4"><div className="font-bold text-slate-800 dark:text-slate-200">{p.tenant}</div><div className="text-xs font-medium text-slate-500">{units.find(u => u.id === p.unitId)?.name} • {formatMonth(p.forMonth)}</div></td>
                                       <td className="py-4 text-right font-black text-emerald-600 tracking-tight">{currency(p.amount)}</td>
