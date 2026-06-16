@@ -206,7 +206,10 @@
                 return { ...initialData, ...saved };
             }
             return initialData;
-        } catch (e) { console.error(e); return initialData; } 
+        } catch (e) { 
+            console.error("Critical Read Error:", e); 
+            throw e; 
+        } 
       };
       
       const saveData = async (data, uid) => { 
@@ -343,6 +346,7 @@
         const [deleteRequest, setDeleteRequest] = useState(null);
         const [showSettingsPrompt, setShowSettingsPrompt] = useState(false);
         const [dueMonth, setDueMonth] = useState(() => monthKey(new Date().toISOString()));
+        const [readError, setReadError] = useState(false);
         const { addToast } = useToast();
         const uid = currentUser?.uid;
 
@@ -357,15 +361,24 @@
 
         useEffect(() => { 
             if (!uid) return;
-            setLoading(true); 
-            loadData(uid).then(init => { setData(init); setLoading(false); }); 
+            setLoading(true);
+            setReadError(false);
+            loadData(uid).then(init => { 
+                setData(init); 
+                setLoading(false); 
+            }).catch(err => {
+                console.error("Failed to load data", err);
+                setReadError(true);
+                setLoading(false);
+                alert("Failed to load data from server. Please refresh or check your permissions. DO NOT make changes.");
+            }); 
         }, [uid]);
 
         useEffect(() => { 
-            if (loading || !uid) return; 
+            if (loading || !uid || readError) return; 
             const timer = setTimeout(() => saveData(data, uid), 800); 
             return () => clearTimeout(timer); 
-        }, [data, loading, uid]);
+        }, [data, loading, uid, readError]);
 
         const updateOrg = (patch) => setData(d => ({ ...d, org: { ...d.org, ...patch } }));
         const updateSettings = (patch) => setData(d => ({ ...d, settings: { ...d.settings, ...patch } }));
@@ -434,7 +447,6 @@
             return { labels, datasets: [ { label: 'Income', data: incomeData, backgroundColor: '#6366f1', borderRadius: 8 }, { label: 'Expense', data: expenseData, backgroundColor: '#f43f5e', borderRadius: 8 } ] };
         }, [data.payments, data.expenses, data.otherIncomes]);
 
-        // Fix outstanding map to also be perfectly safe with unitId or unitName
         const outstandingMap = useMemo(() => {
             const ym = dueMonth;
             const map = {};
