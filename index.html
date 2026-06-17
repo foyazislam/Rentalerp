@@ -7,11 +7,10 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -48,7 +47,7 @@
         --theme-50: #eef2ff; --theme-100: #e0e7ff; --theme-200: #c7d2fe; --theme-300: #a5b4fc; --theme-400: #818cf8;
         --theme-500: #6366f1; --theme-600: #4f46e5; --theme-700: #4338ca; --theme-800: #3730a3; --theme-900: #312e81; }
 
-      /* Custom Scrollbars - Modernized */
+      /* Custom Scrollbars */
       .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
       .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
       .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -61,7 +60,7 @@
   <body class="bg-[#f5f5f7] text-slate-800 dark:bg-[#000000] dark:text-slate-100 selection:bg-indigo-500 selection:text-white antialiased font-medium">
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-presets="react,env">
       const { useEffect, useMemo, useRef, useState, createContext, useContext } = React;
       
       /* ------------- Firebase Config ------------- */
@@ -112,13 +111,28 @@
         slate: { name: 'Graphite', colors: { 50:'#f8fafc', 100:'#f1f5f9', 200:'#e2e8f0', 300:'#cbd5e1', 400:'#94a3b8', 500:'#64748b', 600:'#475569', 700:'#334155', 800:'#1e293b', 900:'#0f172a' }},
       };
 
-      /* ------------- Utilities ------------- */
+      /* ------------- Bulletproof Utilities ------------- */
       const todayStr = () => new Date().toISOString().slice(0, 10);
-      const formatDisplayDate = (dateStr) => { if (!dateStr) return ""; const [y, m, d] = dateStr.split('-'); return `${d}-${m}-${y}`; };
-      const currency = (n) => { const num = Number(n || 0);
-      try { return num.toLocaleString(undefined, { style: "currency", currency: "BDT", minimumFractionDigits: 0 }).replace("BDT", "৳").trim(); } catch { return `৳${num.toLocaleString()}`; } };
-      const formatMonth = (ym) => { if (!ym || ym.length !== 7) return "N/A"; const [year, month] = ym.split('-');
-      return new Date(year, month - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' }); };
+      
+      const formatDisplayDate = (dateStr) => { 
+          if (!dateStr || typeof dateStr !== 'string') return ""; 
+          const parts = dateStr.split('-'); 
+          if (parts.length !== 3) return dateStr;
+          return `${parts[2]}-${parts[1]}-${parts[0]}`; 
+      };
+      
+      const currency = (n) => { 
+          const num = Number(n || 0);
+          try { return num.toLocaleString(undefined, { style: "currency", currency: "BDT", minimumFractionDigits: 0 }).replace("BDT", "৳").trim(); } 
+          catch { return `৳${num.toLocaleString()}`; } 
+      };
+      
+      const formatMonth = (ym) => { 
+          if (!ym || typeof ym !== 'string' || ym.length !== 7) return "N/A"; 
+          const parts = ym.split('-');
+          if (parts.length !== 2) return ym;
+          return new Date(parts[0], parts[1] - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' }); 
+      };
       
       const amountToWords = (n) => {
           if (typeof n !== 'number') { n = Number(n); }
@@ -151,9 +165,19 @@
           return words.replace(/\s+/g, ' ').trim() || "Zero Taka Only";
       };
 
-      const monthKey = (dateStr) => { const d = new Date(dateStr); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
-      const nextReceiptNo = (allPayments) => { const yyyymm = monthKey(new Date().toISOString());
-      const prefix = `RC-${yyyymm}-`; const count = allPayments.filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1; return `${prefix}${String(count).padStart(4, "0")}`; };
+      const monthKey = (dateStr) => { 
+          if (!dateStr) return "N/A";
+          const d = new Date(dateStr); 
+          if (isNaN(d.getTime())) return "N/A";
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; 
+      };
+      
+      const nextReceiptNo = (allPayments) => { 
+          const yyyymm = monthKey(new Date().toISOString());
+          const prefix = `RC-${yyyymm}-`; 
+          const count = (allPayments || []).filter((p) => (p.receiptNo || "").startsWith(prefix)).length + 1; 
+          return `${prefix}${String(count).padStart(4, "0")}`; 
+      };
       
       const exportToCSV = (data, filename) => {
           const csvContent = "data:text/csv;charset=utf-8," + data.map(e => e.join(",")).join("\n");
@@ -168,7 +192,7 @@
       
       const createWhatsAppLink = (phone, tenantName, unitName, orgName, dueDay, rent) => { 
           if (!phone) return null;
-          const p = phone.replace(/\D/g, ''); 
+          const p = String(phone).replace(/\D/g, ''); 
           const msg = `*Rent Reminder from ${orgName}*\n\nDear ${tenantName} (Unit: ${unitName}),\n\nYour rent of ${currency(rent)} is due by date ${dueDay}.\nPlease pay on time.\nThank you!`;
           return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`; 
       };
@@ -179,14 +203,24 @@
           const formattedMonth = formatMonth(payment.forMonth); 
           const displayDate = formatDisplayDate(payment.date); 
           const displayPurpose = (payment.purpose === "Rent" || !payment.purpose) ? "Rent And Service Charge" : payment.purpose;
-          return ` <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 20px; background: white; border: 1px solid #ddd;"> <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;"> <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org.name)}</h1> <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org.address)} | Phone: ${escapeHTML(org.phone)}</p> </div> <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2> <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;"> <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span> <span><b>Date:</b> ${escapeHTML(displayDate)}</span> </div> <table style="width:100%; font-size:14px; border-collapse: collapse;"> <tr><td style="padding:4px 0;"><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td></tr> <tr> <td style="padding:4px 0;"><b>For Unit No:</b> ${escapeHTML(unitName)}</td> <td style="padding:4px 0;"><b>Purpose:</b> ${escapeHTML(displayPurpose)}</td> </tr> <tr> <td style="padding:4px 0;"><b>For The Month:</b> ${escapeHTML(formattedMonth)}</td> <td style="padding:4px 0;"><b>Method:</b> ${escapeHTML(payment.method)}</td> </tr> <tr> <td style="padding:4px 0;"><b>In Words:</b> ${amountToWords(payment.amount)}</td> <td style="padding:4px 0;"><b>Amount:</b> <b style="font-size:16px;">${currency(payment.amount)}</b></td> </tr> </table> ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""} <div style="height:30px;"></div> <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;"> <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org.note || "")}</div> <div style="margin-right:10px;"><div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px; text-align:center;">Authorized Signature</div></div> </div> </div> `;
+          return ` <div style="font-family: Times New Roman, system-ui, sans-serif; max-width: 190mm; margin: 0 auto; padding: 20px; background: white; border: 1px solid #ddd;"> <div style="text-align:center; padding-bottom:4px; border-bottom:3px solid #e2e8f0;"> <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">${escapeHTML(org?.name)}</h1> <p style="font-size: 0.65rem; color: #475569; margin: 0;">${escapeHTML(org?.address)} | Phone: ${escapeHTML(org?.phone)}</p> </div> <h2 style="font-size: 1rem; font-weight: 600; text-align:center; padding: 4px 0; margin: 0;">MONEY RECEIPT</h2> <div style="display:flex; justify-content:space-between; font-size: 0.7rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 4px;"> <span><b>Receipt #:</b> ${escapeHTML(payment.receiptNo)}</span> <span><b>Date:</b> ${escapeHTML(displayDate)}</span> </div> <table style="width:100%; font-size:14px; border-collapse: collapse;"> <tr><td style="padding:4px 0;"><b>Received With Thanks From:</b> ${escapeHTML(payment.tenant)}</td></tr> <tr> <td style="padding:4px 0;"><b>For Unit No:</b> ${escapeHTML(unitName)}</td> <td style="padding:4px 0;"><b>Purpose:</b> ${escapeHTML(displayPurpose)}</td> </tr> <tr> <td style="padding:4px 0;"><b>For The Month:</b> ${escapeHTML(formattedMonth)}</td> <td style="padding:4px 0;"><b>Method:</b> ${escapeHTML(payment.method)}</td> </tr> <tr> <td style="padding:4px 0;"><b>In Words:</b> ${amountToWords(payment.amount)}</td> <td style="padding:4px 0;"><b>Amount:</b> <b style="font-size:16px;">${currency(payment.amount)}</b></td> </tr> </table> ${payment.notes ? `<div style="margin-top:4px; font-size:10px; color:#475569;"><b>Notes:</b> ${escapeHTML(payment.notes)}</div>` : ""} <div style="height:30px;"></div> <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:flex-end;"> <div style="font-size:10px; color:#334155; max-width: 50%;">${escapeHTML(org?.note || "")}</div> <div style="margin-right:10px;"><div style="border-top:1px solid #94a3b8; padding-top:4px; font-size:10px; text-align:center;">Authorized Signature</div></div> </div> </div> `;
       }
       
       function renderReceiptHTML(org, payment, unit) { return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Receipt</title><style>@media print{@page{size:A4 portrait;margin:0}body{margin:0!important;padding:0!important}.sheet{height:98mm;width:100%;box-sizing:border-box;page-break-inside:avoid;border-bottom:1px dashed #ccc;display:flex;align-items:center;justify-content:center}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;max-width:210mm;display:flex;align-items:center;justify-content:center;border-bottom:1px dashed #ccc}</style></head><body><div class="sheet"><div style="width:100%;">${renderReceiptInner(org, payment, unit)}</div></div></body></html>`; }
 
       const classNames = (...c) => c.filter(Boolean).join(" ");
-      if (!(window.crypto && window.crypto.randomUUID)) { window.crypto = window.crypto || {};
-      window.crypto.randomUUID = function () { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { const r = (Math.random() * 16) | 0; const v = c === 'x' ? r : (r & 0x3) | 0x8; return v.toString(16); }); }; }
+      
+      /* ------------- Safe UUID Generator ------------- */
+      const generateUUID = () => {
+          if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
+              return window.crypto.randomUUID();
+          }
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              const r = (Math.random() * 16) | 0;
+              const v = c === 'x' ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+          });
+      };
 
       /* ------------- Initial Data ------------- */
       const initialData = {
@@ -203,7 +237,16 @@
             const doc = await db.doc(`erp_data/${uid}`).get();
             if (doc.exists) {
                 const saved = doc.data();
-                return { ...initialData, ...saved };
+                return { 
+                    ...initialData,
+                    ...saved,
+                    org: { ...initialData.org, ...(saved.org || {}) },
+                    settings: { ...initialData.settings, ...(saved.settings || {}) },
+                    units: Array.isArray(saved.units) ? saved.units : initialData.units,
+                    payments: Array.isArray(saved.payments) ? saved.payments : initialData.payments,
+                    expenses: Array.isArray(saved.expenses) ? saved.expenses : initialData.expenses,
+                    otherIncomes: Array.isArray(saved.otherIncomes) ? saved.otherIncomes : initialData.otherIncomes
+                };
             }
             return initialData;
         } catch (e) { 
@@ -384,12 +427,12 @@
         const updateSettings = (patch) => setData(d => ({ ...d, settings: { ...d.settings, ...patch } }));
         
         const upsertUnit = (unit) => {
-            setData(d => ({ ...d, units: d.units.some(x => x.id === unit.id) ? d.units.map(x => x.id === unit.id ? { ...x, ...unit } : x) : [...d.units, unit] }));
+            setData(d => ({ ...d, units: (d.units || []).some(x => x.id === unit.id) ? d.units.map(x => x.id === unit.id ? { ...x, ...unit } : x) : [...(d.units || []), unit] }));
             addToast("Unit saved successfully");
         };
         const deleteUnit = (id) => { 
             if(!confirm("Delete this unit?")) return;
-            setData(d => ({ ...d, units: d.units.filter(u => u.id !== id) })); 
+            setData(d => ({ ...d, units: (d.units || []).filter(u => u.id !== id) })); 
             addToast("Unit deleted");
         };
         
@@ -398,9 +441,9 @@
             try { await auth.signInWithEmailAndPassword(currentUser.email, password); return true; } catch { return false; } 
         };
         
-        const deletePayment = (id) => { setData((d) => ({ ...d, payments: d.payments.filter((p) => p.id !== id) })); setDeleteRequest(null); addToast("Payment deleted", "error"); };
-        const deleteExpense = (id) => { setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) })); setDeleteRequest(null); addToast("Expense deleted", "error"); };
-        const addOtherIncome = (inc) => { const newInc = { ...inc, id: crypto.randomUUID() }; setData(d => ({ ...d, otherIncomes: [newInc, ...(d.otherIncomes || [])] })); addToast("Income recorded"); };
+        const deletePayment = (id) => { setData((d) => ({ ...d, payments: (d.payments || []).filter((p) => p.id !== id) })); setDeleteRequest(null); addToast("Payment deleted", "error"); };
+        const deleteExpense = (id) => { setData((d) => ({ ...d, expenses: (d.expenses || []).filter((e) => e.id !== id) })); setDeleteRequest(null); addToast("Expense deleted", "error"); };
+        const addOtherIncome = (inc) => { const newInc = { ...inc, id: generateUUID() }; setData(d => ({ ...d, otherIncomes: [newInc, ...(d.otherIncomes || [])] })); addToast("Income recorded"); };
         const deleteOtherIncome = (id) => { setData((d) => ({ ...d, otherIncomes: (d.otherIncomes || []).filter((i) => i.id !== id) })); setDeleteRequest(null); addToast("Income deleted", "error"); };
 
         const syncToSheet = (payload) => {
@@ -410,26 +453,26 @@
         };
 
         const addPayment = (p) => {
-            const newPayment = { ...p, id: crypto.randomUUID(), isPrinted: false };
-            setData(d => ({ ...d, payments: [newPayment, ...d.payments] }));
+            const newPayment = { ...p, id: generateUUID(), isPrinted: false };
+            setData(d => ({ ...d, payments: [newPayment, ...(d.payments || [])] }));
             addToast(`Receipt ${p.receiptNo} created`);
             syncToSheet({ type: "Income", date: p.date, amount: Number(p.amount), desc: `Rent: ${p.tenant} (${p.unitId})`, receiptNo: p.receiptNo, unit: p.unitId, tenant: p.tenant, month: p.forMonth, method: p.method });
         };
         
         const addExpense = (e) => {
-            const newExpense = { ...e, id: crypto.randomUUID() };
-            setData(d => ({ ...d, expenses: [newExpense, ...d.expenses] }));
+            const newExpense = { ...e, id: generateUUID() };
+            setData(d => ({ ...d, expenses: [newExpense, ...(d.expenses || [])] }));
             addToast("Expense recorded");
             syncToSheet({ type: "Expense", date: e.date, amount: -Math.abs(Number(e.amount)), desc: `${e.category} - ${e.vendor || 'No Vendor'}`, category: e.category, vendor: e.vendor || "", notes: e.notes || "" });
         };
 
-        const markAsPrinted = (id) => { setData(d => ({ ...d, payments: d.payments.map(p => p.id === id ? { ...p, isPrinted: true } : p) })); };
+        const markAsPrinted = (id) => { setData(d => ({ ...d, payments: (d.payments || []).map(p => p.id === id ? { ...p, isPrinted: true } : p) })); };
 
         const totals = useMemo(() => {
-            const rentIncome = data.payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+            const rentIncome = (data.payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
             const otherIncome = (data.otherIncomes || []).reduce((s, i) => s + Number(i.amount || 0), 0);
             const income = rentIncome + otherIncome;
-            const expense = data.expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+            const expense = (data.expenses || []).reduce((s, e) => s + Number(e.amount || 0), 0);
             return { income, expense, net: income - expense };
         }, [data.payments, data.expenses, data.otherIncomes]);
 
@@ -439,9 +482,9 @@
                 const d = new Date(); d.setMonth(d.getMonth() - i);
                 const key = monthKey(d.toISOString());
                 labels.push(d.toLocaleString('default', { month: 'short' }));
-                const rentInc = data.payments.filter(p => (p.date || "").startsWith(key)).reduce((s, p) => s + Number(p.amount || 0), 0);
+                const rentInc = (data.payments || []).filter(p => (p.date || "").startsWith(key)).reduce((s, p) => s + Number(p.amount || 0), 0);
                 const otherInc = (data.otherIncomes || []).filter(inc => (inc.date || "").startsWith(key)).reduce((s, inc) => s + Number(inc.amount || 0), 0);
-                const exp = data.expenses.filter(e => (e.date || "").startsWith(key)).reduce((s, e) => s + Number(e.amount || 0), 0);
+                const exp = (data.expenses || []).filter(e => (e.date || "").startsWith(key)).reduce((s, e) => s + Number(e.amount || 0), 0);
                 incomeData.push(rentInc + otherInc); expenseData.push(exp);
             }
             return { labels, datasets: [ { label: 'Income', data: incomeData, backgroundColor: '#6366f1', borderRadius: 8 }, { label: 'Expense', data: expenseData, backgroundColor: '#f43f5e', borderRadius: 8 } ] };
@@ -450,10 +493,10 @@
         const outstandingMap = useMemo(() => {
             const ym = dueMonth;
             const map = {};
-            data.units.forEach(u => map[u.id] = Number(u.rent) || 0);
-            data.payments.filter(p => (p.forMonth || "").startsWith(ym)).forEach(p => { 
+            (data.units || []).forEach(u => map[u.id] = Number(u.rent) || 0);
+            (data.payments || []).filter(p => (p.forMonth || "").startsWith(ym)).forEach(p => { 
                 let uId = p.unitId;
-                const matchedUnitByName = data.units.find(u => u.name === p.unitId);
+                const matchedUnitByName = (data.units || []).find(u => u.name === p.unitId);
                 if (matchedUnitByName) uId = matchedUnitByName.id;
                 
                 map[uId] = Math.max(0, (map[uId] || 0) - Number(p.amount || 0)); 
@@ -474,7 +517,7 @@
               <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white p-2 rounded-[14px] shadow-lg shadow-indigo-500/30"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></div>
-                    <div className="font-extrabold tracking-tight text-xl text-slate-900 dark:text-white truncate">{data.org.name || "RMS Pro"}</div>
+                    <div className="font-extrabold tracking-tight text-xl text-slate-900 dark:text-white truncate">{data.org?.name || "RMS Pro"}</div>
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="hidden sm:inline-flex px-3 py-1 bg-black/5 dark:bg-white/10 rounded-full text-xs font-bold text-slate-600 dark:text-slate-300">{currentUser.email}</span>
@@ -496,7 +539,7 @@
             <main className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8 space-y-8 pb-32 md:pb-16 no-print">
               {tab === "dashboard" && <Dashboard totals={totals} units={data.units} outstanding={outstandingMap} chartData={chartData} expenses={data.expenses} org={data.org} dueMonth={dueMonth} setDueMonth={setDueMonth} />}
               {tab === "units" && <UnitsSection units={data.units} upsertUnit={upsertUnit} deleteUnit={deleteUnit} />}
-              {tab === "payments" && <PaymentsSection payments={data.payments} units={data.units} org={data.org} onRowClick={setShowReceipt} onDelete={(id) => setDeleteRequest({ type: 'payment', id })} onPrintBulk={(ids) => { setData(d => ({ ...d, payments: d.payments.map(p => ids.includes(p.id) ? { ...p, isPrinted: true } : p) })); }} />}
+              {tab === "payments" && <PaymentsSection payments={data.payments} units={data.units} org={data.org} onRowClick={setShowReceipt} onDelete={(id) => setDeleteRequest({ type: 'payment', id })} onPrintBulk={(ids) => { setData(d => ({ ...d, payments: (d.payments || []).map(p => ids.includes(p.id) ? { ...p, isPrinted: true } : p) })); }} />}
               {tab === "previousDues" && <PreviousDuesSection units={data.units} payments={data.payments} org={data.org} />}
               {tab === "newReceipt" && <NewReceiptSection units={data.units} addPayment={addPayment} data={data} />}
               {tab === "otherIncomes" && <OtherIncomesSection incomes={data.otherIncomes || []} addIncome={addOtherIncome} onDelete={(id) => setDeleteRequest({ type: 'otherIncome', id })} />}
@@ -505,7 +548,7 @@
               {tab === "settings" && <SettingsSection org={data.org} settings={data.settings} updateOrg={updateOrg} updateSettings={updateSettings} data={data} setData={setData} />}
             </main>
 
-            {showReceipt && <ReceiptModal org={data.org} payment={showReceipt} unit={data.units.find(u => u.id === showReceipt.unitId)} onClose={() => setShowReceipt(null)} onPrintMark={() => markAsPrinted(showReceipt.id)} />}
+            {showReceipt && <ReceiptModal org={data.org} payment={showReceipt} unit={(data.units || []).find(u => u.id === showReceipt.unitId)} onClose={() => setShowReceipt(null)} onPrintMark={() => markAsPrinted(showReceipt.id)} />}
             {(showSettingsPrompt || deleteRequest) && <PasswordPromptModal currentUser={currentUser} isPasswordCorrect={isPasswordCorrect} onClose={() => { setShowSettingsPrompt(false); setDeleteRequest(null); }} onSuccess={() => { 
                 if (showSettingsPrompt) { setTab('settings'); setShowSettingsPrompt(false); } 
                 else if (deleteRequest) { if (deleteRequest.type === 'payment') deletePayment(deleteRequest.id); else if (deleteRequest.type === 'expense') deleteExpense(deleteRequest.id); else if (deleteRequest.type === 'otherIncome') deleteOtherIncome(deleteRequest.id); } 
@@ -520,43 +563,41 @@
           const currentYm = monthKey(todayStr());
           
           const duesList = useMemo(() => {
-              return units.map(u => {
+              return (units || []).map(u => {
                   if (!u.tenant) return null; // Ignore vacant units
                   
                   let startMonth;
                   if (u.assignDate) {
                       startMonth = monthKey(u.assignDate);
                   } else {
-                      // Fallback: strictly matching Unit ID (or Unit Name for legacy safety)
-                      const unitPayments = payments.filter(p => (p.unitId === u.id || p.unitId === u.name) && p.forMonth);
+                      const unitPayments = (payments || []).filter(p => (p.unitId === u.id || p.unitId === u.name) && p.forMonth);
                       if (unitPayments.length === 0) return null;
                       const monthsWithPayments = unitPayments.map(p => p.forMonth).sort();
                       startMonth = monthsWithPayments[0];
                   }
                   
-                  if (!startMonth) return null;
+                  if (!startMonth || startMonth === "N/A") return null;
 
                   let pastDueTotal = 0;
                   const missedMonths = [];
                   
                   let curr = new Date(startMonth + "-01");
+                  if (isNaN(curr.getTime())) return null;
+
                   const end = new Date(currentYm + "-01");
                   
                   // Scan from assignment date up to the PREVIOUS month
                   while (curr < end) {
                       const ym = monthKey(curr.toISOString());
-                      
-                      // Calculate the exact due strictly by UNIT, ignoring tenant mismatch
-                      const paid = payments.filter(p => (p.unitId === u.id || p.unitId === u.name) && p.forMonth === ym)
-                                           .reduce((sum, p) => sum + Number(p.amount), 0);
+                      const paid = (payments || []).filter(p => (p.unitId === u.id || p.unitId === u.name) && p.forMonth === ym)
+                                           .reduce((sum, p) => sum + Number(p.amount || 0), 0);
                                            
-                      const due = Math.max(0, Number(u.rent) - paid);
+                      const due = Math.max(0, Number(u.rent || 0) - paid);
                       
                       if (due > 0) {
                           pastDueTotal += due;
                           missedMonths.push({ month: ym, due });
                       }
-                      
                       curr.setMonth(curr.getMonth() + 1);
                   }
                   
@@ -583,7 +624,6 @@
                                               {item.unit.id}
                                           </div>
                                           <div>
-                                              {/* Flipped hierarchy: Unit Name is now the primary header */}
                                               <div className="font-black text-lg text-slate-900 dark:text-white">{item.unit.name}</div>
                                               <div className="text-sm font-medium text-slate-500">Tenant: <span className="font-bold">{item.unit.tenant}</span> • Rent: {currency(item.unit.rent)}</div>
                                           </div>
@@ -605,7 +645,7 @@
                                               <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 md:text-right">Total Past Due</div>
                                               <div className="text-2xl font-black text-rose-600 tracking-tight">{currency(item.pastDueTotal)}</div>
                                           </div>
-                                          <a href={createWhatsAppLink(item.unit.tenantPhone, item.unit.tenant, item.unit.name, org.name, item.unit.dueDay, item.pastDueTotal)} target="_blank" className="bg-[#25D366] hover:bg-[#1DA851] text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-[0_4px_12px_rgba(37,211,102,0.3)] active:scale-95 transition-all w-full justify-center md:w-auto">
+                                          <a href={createWhatsAppLink(item.unit.tenantPhone, item.unit.tenant, item.unit.name, org?.name, item.unit.dueDay, item.pastDueTotal)} target="_blank" className="bg-[#25D366] hover:bg-[#1DA851] text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-[0_4px_12px_rgba(37,211,102,0.3)] active:scale-95 transition-all w-full justify-center md:w-auto">
                                               <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.374-5.03c0-5.445 4.431-9.872 9.871-9.872 2.636 0 5.115 1.026 6.979 2.89 1.864 1.864 2.89 4.343 2.89 6.979 0 5.445-4.431 9.872-9.871 9.872z"/></svg> Remind Past Due
                                           </a>
                                       </div>
@@ -623,17 +663,17 @@
           const totalDue = Object.values(outstanding).reduce((a,b) => a + Number(b), 0);
           
           const expenseCats = {};
-          expenses.forEach(e => { const cat = e.category || "Uncategorized"; expenseCats[cat] = (expenseCats[cat] || 0) + Number(e.amount); });
+          (expenses || []).forEach(e => { const cat = e.category || "Uncategorized"; expenseCats[cat] = (expenseCats[cat] || 0) + Number(e.amount || 0); });
           const pieData = { labels: Object.keys(expenseCats), datasets: [{ data: Object.values(expenseCats), backgroundColor: ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#64748b'], borderWidth: 0, hoverOffset: 4 }] };
           
           const currentYm = monthKey(new Date().toISOString());
-          const overdueUnits = units.filter(u => { 
+          const overdueUnits = (units || []).filter(u => { 
               const bal = outstanding[u.id] || 0; 
               if (bal <= 0 || !u.enableReminder || !u.tenant) return false;
-              if (dueMonth < currentYm) return true;
-              return new Date().getDate() >= (Number(u.dueDay) - 2); 
+              if (dueMonth && dueMonth < currentYm) return true;
+              return new Date().getDate() >= (Number(u.dueDay || 0) - 2); 
           });
-          const unpaidUnits = units.filter(u => (outstanding[u.id] || 0) > 0 && u.tenant);
+          const unpaidUnits = (units || []).filter(u => (outstanding[u.id] || 0) > 0 && u.tenant);
           
           return (
               <div className="space-y-8 animate-slide-up">
@@ -687,7 +727,7 @@
                                                   <div className="text-xs font-bold text-rose-500">Due: {currency(outstanding[u.id])}</div>
                                               </div>
                                           </div>
-                                          <a href={createWhatsAppLink(u.tenantPhone, u.tenant, u.name, org.name, u.dueDay, outstanding[u.id])} target="_blank" className="bg-[#25D366] hover:bg-[#1DA851] text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-[0_4px_12px_rgba(37,211,102,0.3)] active:scale-95 transition-all">
+                                          <a href={createWhatsAppLink(u.tenantPhone, u.tenant, u.name, org?.name, u.dueDay, outstanding[u.id])} target="_blank" className="bg-[#25D366] hover:bg-[#1DA851] text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-[0_4px_12px_rgba(37,211,102,0.3)] active:scale-95 transition-all">
                                               <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.374-5.03c0-5.445 4.431-9.872 9.871-9.872 2.636 0 5.115 1.026 6.979 2.89 1.864 1.864 2.89 4.343 2.89 6.979 0 5.445-4.431 9.872-9.871 9.872z"/></svg> Send
                                           </a>
                                       </div>
@@ -703,7 +743,7 @@
                           </Section>
                           <Section title="Top Value Units">
                               <div className="space-y-4">
-                                  {units.sort((a,b) => b.rent - a.rent).slice(0,4).map((u, i) => (
+                                  {(units || []).sort((a,b) => b.rent - a.rent).slice(0,4).map((u, i) => (
                                       <div key={u.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                                           <div className="flex items-center gap-3"><span className={`text-xs font-black w-6 h-6 flex items-center justify-center rounded-full ${i===0?'bg-amber-100 text-amber-600': 'bg-black/5 dark:bg-white/10 text-slate-500 dark:text-slate-300'}`}>{i+1}</span><span className="text-sm font-bold text-slate-700 dark:text-slate-200">{u.name}</span></div>
                                           <span className="text-sm font-black text-slate-900 dark:text-white tracking-tight">{currency(u.rent)}</span>
@@ -719,7 +759,12 @@
 
       function UnitsSection({ units, upsertUnit, deleteUnit }) {
           const [form, setForm] = useState({}); const [search, setSearch] = useState("");
-          const filtered = units.filter(u => u.name.toLowerCase().includes(search.toLowerCase()) || (u.tenant||"").toLowerCase().includes(search.toLowerCase()));
+          
+          const filtered = (units || []).filter(u => 
+              (u.name || "").toLowerCase().includes(search.toLowerCase()) || 
+              (u.tenant || "").toLowerCase().includes(search.toLowerCase())
+          );
+
           return (
               <div className="grid lg:grid-cols-3 gap-8">
                   <Section title={form.id ? "Edit Unit" : "Add Unit"} className="h-fit sticky top-24">
@@ -785,11 +830,14 @@
           const itemsPerPage = 10;
 
           const filtered = useMemo(() => { 
-              let res = payments; 
+              let res = payments || []; 
               if (monthFilter) res = res.filter(p => (p.forMonth || "").startsWith(monthFilter)); 
               if (search) { 
                   const q = search.toLowerCase(); 
-                  res = res.filter(p => p.receiptNo.toLowerCase().includes(q) || p.tenant.toLowerCase().includes(q)); 
+                  res = res.filter(p => 
+                      (p.receiptNo || "").toLowerCase().includes(q) || 
+                      (p.tenant || "").toLowerCase().includes(q)
+                  ); 
               } 
               return res.sort((a,b) => new Date(b.date) - new Date(a.date)); 
           }, [payments, search, monthFilter]);
@@ -800,12 +848,12 @@
 
           const handlePrintSelected = () => {
               if (selectedReceipts.length === 0) return;
-              const receiptsToPrint = payments.filter(p => selectedReceipts.includes(p.id));
+              const receiptsToPrint = (payments || []).filter(p => selectedReceipts.includes(p.id));
 
               let combinedHtml = `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Bulk Print Receipts</title><style>@media print{@page{size:A4 portrait;margin:0}body{margin:0!important;padding:0!important}.sheet{height:98mm;width:100%;box-sizing:border-box;page-break-inside:avoid;border-bottom:1.5px dashed #888;display:flex;align-items:center;justify-content:center}.sheet:nth-child(3n){border-bottom:none;page-break-after:always}}body{background:white;margin:0}.sheet{background:white;margin:0 auto;padding:15px;max-width:210mm;border-bottom:1.5px dashed #ccc;display:flex;align-items:center;justify-content:center}</style></head><body>`;
 
               receiptsToPrint.forEach(payment => {
-                  const unit = units.find(u => u.id === payment.unitId);
+                  const unit = (units || []).find(u => u.id === payment.unitId);
                   combinedHtml += `<div class="sheet"><div style="width:100%;">${renderReceiptInner(org, payment, unit)}</div></div>`;
               });
 
@@ -866,7 +914,7 @@
                                           <input type="checkbox" checked={selectedReceipts.includes(p.id)} onChange={() => toggleSelect(p.id)} className="cursor-pointer h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
                                       </td>
                                       <td className="py-4"><div className="font-medium text-slate-900 dark:text-white">{formatDisplayDate(p.date)}</div><div className="text-xs font-mono font-bold text-indigo-500">{p.receiptNo} {p.isPrinted && <span title="Printed">✓</span>}</div></td>
-                                      <td className="py-4"><div className="font-bold text-slate-800 dark:text-slate-200">{p.tenant}</div><div className="text-xs font-medium text-slate-500">{units.find(u => u.id === p.unitId)?.name} • {formatMonth(p.forMonth)}</div></td>
+                                      <td className="py-4"><div className="font-bold text-slate-800 dark:text-slate-200">{p.tenant}</div><div className="text-xs font-medium text-slate-500">{(units||[]).find(u => u.id === p.unitId)?.name} • {formatMonth(p.forMonth)}</div></td>
                                       <td className="py-4 text-right font-black text-emerald-600 tracking-tight">{currency(p.amount)}</td>
                                       <td className="py-4">
                                           <div className="flex justify-center gap-2">
@@ -888,9 +936,9 @@
       function NewReceiptSection({ units, addPayment, data }) {
           const [form, setForm] = useState({ date: todayStr(), method: "Cash", purpose: "Rent" });
           useEffect(() => { if (!form.receiptNo) setForm(f => ({ ...f, receiptNo: nextReceiptNo(data.payments) })); }, [data.payments]);
-          const selectedUnit = units.find(u => u.id === form.unitId);
+          const selectedUnit = (units || []).find(u => u.id === form.unitId);
           
-          const submit = () => { if (!form.unitId || !form.amount || !form.forMonth) return alert("Fill all required fields"); addPayment({ ...form, amount: Number(form.amount), purpose: form.purpose }); setForm({ date: todayStr(), method: "Cash", purpose: "Rent", receiptNo: nextReceiptNo([...data.payments, form]) }); };
+          const submit = () => { if (!form.unitId || !form.amount || !form.forMonth) return alert("Fill all required fields"); addPayment({ ...form, amount: Number(form.amount), purpose: form.purpose }); setForm({ date: todayStr(), method: "Cash", purpose: "Rent", receiptNo: nextReceiptNo([...(data.payments||[]), form]) }); };
 
           return (
               <div className="grid lg:grid-cols-3 gap-8">
@@ -898,9 +946,9 @@
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                           <Input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                           <Select value={form.purpose} onChange={e => setForm({...form, purpose: e.target.value})}><option>Rent</option><option>Advance</option><option>Service Charge</option><option>Utility</option></Select>
-                          <Select value={form.unitId||""} onChange={e => { const u=units.find(x=>x.id===e.target.value); if(u) setForm(f=>({...f, unitId: u.id, tenant: u.tenant, amount: u.rent})); }}>
+                          <Select value={form.unitId||""} onChange={e => { const u=(units||[]).find(x=>x.id===e.target.value); if(u) setForm(f=>({...f, unitId: u.id, tenant: u.tenant, amount: u.rent})); }}>
                               <option value="" disabled>Select Unit...</option>
-                              {units.map(u => <option key={u.id} value={u.id}>{u.name} {u.tenant ? `(${u.tenant})` : '- Vacant'}</option>)}
+                              {(units||[]).map(u => <option key={u.id} value={u.id}>{u.name} {u.tenant ? `(${u.tenant})` : '- Vacant'}</option>)}
                           </Select>
                           <Input type="month" value={form.forMonth||""} onChange={e => setForm({...form, forMonth: e.target.value})} />
                           <Input placeholder="Tenant Name" value={form.tenant||""} onChange={e => setForm({...form, tenant: e.target.value})} />
@@ -938,7 +986,7 @@
 
       function OtherIncomesSection({ incomes = [], addIncome, onDelete }) {
           const [form, setForm] = useState({ date: todayStr() }); const [currentPage, setCurrentPage] = useState(1); const itemsPerPage = 10;
-          const sorted = useMemo(() => incomes.sort((a,b) => new Date(b.date)-new Date(a.date)), [incomes]);
+          const sorted = useMemo(() => (incomes||[]).sort((a,b) => new Date(b.date)-new Date(a.date)), [incomes]);
           const paginated = useMemo(() => sorted.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage), [sorted, currentPage]);
 
           return (
@@ -977,7 +1025,7 @@
 
       function ExpensesSection({ expenses, addExpense, onDelete }) {
           const [form, setForm] = useState({ date: todayStr() }); const [currentPage, setCurrentPage] = useState(1); const itemsPerPage = 10;
-          const sorted = useMemo(() => expenses.sort((a,b) => new Date(b.date)-new Date(a.date)), [expenses]);
+          const sorted = useMemo(() => (expenses||[]).sort((a,b) => new Date(b.date)-new Date(a.date)), [expenses]);
           const paginated = useMemo(() => sorted.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage), [sorted, currentPage]);
           
           return (
@@ -1020,9 +1068,9 @@
           
           const report = useMemo(() => {
               const s = new Date(range.start).getTime(); const e = new Date(range.end).getTime() + 86400000;
-              const pItems = payments.filter(x => { const t = new Date(x.date).getTime(); return t >= s && t < e; }).map(x => ({ ...x, type: 'inc', desc: `Rent - ${x.tenant}` }));
+              const pItems = (payments||[]).filter(x => { const t = new Date(x.date).getTime(); return t >= s && t < e; }).map(x => ({ ...x, type: 'inc', desc: `Rent - ${x.tenant}` }));
               const oItems = (otherIncomes || []).filter(x => { const t = new Date(x.date).getTime(); return t >= s && t < e; }).map(x => ({ ...x, type: 'inc', desc: `Other Income - ${x.source}` }));
-              const eItems = expenses.filter(x => { const t = new Date(x.date).getTime(); return t >= s && t < e; }).map(x => ({ ...x, type: 'exp', desc: `${x.category} (${x.vendor||'-'})` }));
+              const eItems = (expenses||[]).filter(x => { const t = new Date(x.date).getTime(); return t >= s && t < e; }).map(x => ({ ...x, type: 'exp', desc: `${x.category} (${x.vendor||'-'})` }));
               
               const all = [...pItems, ...oItems, ...eItems].sort((a,b) => new Date(a.date) - new Date(b.date));
               const totalInc = pItems.reduce((sum, x) => sum + Number(x.amount), 0) + oItems.reduce((sum, x) => sum + Number(x.amount), 0);
@@ -1034,7 +1082,7 @@
 
           const printStatement = () => {
               const w = window.open("", "_blank");
-              const html = `<!DOCTYPE html><html><head><title>Statement</title><style>body{font-family:sans-serif;font-size:12px;padding:20px}.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:10px}.header h1{margin:0;font-size:20px}.header p{margin:2px 0;color:#555}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:6px;text-align:left}th{background:#f0f0f0}.text-right{text-align:right}.summary{margin-top:20px;display:flex;justify-content:flex-end;gap:20px;font-weight:bold}</style></head><body><div class="header"><h1>${escapeHTML(org.name)}</h1><p>${escapeHTML(org.address)}</p><p>Phone: ${escapeHTML(org.phone)}</p><h3>Financial Statement</h3><p>From: ${formatDisplayDate(range.start)} To: ${formatDisplayDate(range.end)}</p></div><table><thead><tr><th style="width: 40px">S.N.</th><th>Date</th><th>Description</th><th>Type</th><th class="text-right">Amount</th><th class="text-right">Balance</th></tr></thead><tbody>${report.rows.map((item, index) => `<tr><td>${index + 1}</td><td>${formatDisplayDate(item.date)}</td><td>${escapeHTML(item.desc)}</td><td>${item.type === 'inc' ? 'Income' : 'Expense'}</td><td class="text-right">${currency(item.amount)}</td><td class="text-right">${currency(item.bal)}</td></tr>`).join('')}</tbody></table><div class="summary"><div>Total Income: ${currency(report.totalInc)}</div><div style="margin-left: 20px;">Total Expense: ${currency(report.totalExp)}</div><div style="margin-left: 20px;">Net Profit: ${currency(report.net)}</div></div><script>window.print();<\/script></body></html>`;
+              const html = `<!DOCTYPE html><html><head><title>Statement</title><style>body{font-family:sans-serif;font-size:12px;padding:20px}.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:10px}.header h1{margin:0;font-size:20px}.header p{margin:2px 0;color:#555}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:6px;text-align:left}th{background:#f0f0f0}.text-right{text-align:right}.summary{margin-top:20px;display:flex;justify-content:flex-end;gap:20px;font-weight:bold}</style></head><body><div class="header"><h1>${escapeHTML(org?.name)}</h1><p>${escapeHTML(org?.address)}</p><p>Phone: ${escapeHTML(org?.phone)}</p><h3>Financial Statement</h3><p>From: ${formatDisplayDate(range.start)} To: ${formatDisplayDate(range.end)}</p></div><table><thead><tr><th style="width: 40px">S.N.</th><th>Date</th><th>Description</th><th>Type</th><th class="text-right">Amount</th><th class="text-right">Balance</th></tr></thead><tbody>${report.rows.map((item, index) => `<tr><td>${index + 1}</td><td>${formatDisplayDate(item.date)}</td><td>${escapeHTML(item.desc)}</td><td>${item.type === 'inc' ? 'Income' : 'Expense'}</td><td class="text-right">${currency(item.amount)}</td><td class="text-right">${currency(item.bal)}</td></tr>`).join('')}</tbody></table><div class="summary"><div>Total Income: ${currency(report.totalInc)}</div><div style="margin-left: 20px;">Total Expense: ${currency(report.totalExp)}</div><div style="margin-left: 20px;">Net Profit: ${currency(report.net)}</div></div><script>window.print();<\/script></body></html>`;
               w.document.write(html); w.document.close();
           };
 
@@ -1086,8 +1134,8 @@
       
       function SettingsSection({ org, settings, updateOrg, updateSettings, data, setData }) {
           const [showTutorial, setShowTutorial] = useState(false);
-          const exportData = () => { const blob = new Blob([JSON.stringify(data)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup_${todayStr()}.json`; a.click(); };
-          const importData = (e) => { const fr = new FileReader(); fr.onload = (ev) => { setData(JSON.parse(ev.target.result)); alert("Restored!"); }; if (e.target.files[0]) fr.readAsText(e.target.files[0]); };
+          const downloadBackupData = () => { const blob = new Blob([JSON.stringify(data)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup_${todayStr()}.json`; a.click(); };
+          const restoreBackupData = (e) => { const fr = new FileReader(); fr.onload = (ev) => { setData(JSON.parse(ev.target.result)); alert("Restored!"); }; if (e.target.files[0]) fr.readAsText(e.target.files[0]); };
           
           return (
               <div className="grid md:grid-cols-2 gap-8">
@@ -1119,18 +1167,18 @@
 
                   <Section title="Organization Info">
                       <div className="space-y-4">
-                          <Input placeholder="Organization Name" value={org.name} onChange={e => updateOrg({ name: e.target.value })} />
-                          <Input placeholder="Address" value={org.address} onChange={e => updateOrg({ address: e.target.value })} />
-                          <Input placeholder="Phone" value={org.phone} onChange={e => updateOrg({ phone: e.target.value })} />
-                          <Input placeholder="Receipt Footer Note" value={org.note} onChange={e => updateOrg({ note: e.target.value })} />
+                          <Input placeholder="Organization Name" value={org?.name || ""} onChange={e => updateOrg({ name: e.target.value })} />
+                          <Input placeholder="Address" value={org?.address || ""} onChange={e => updateOrg({ address: e.target.value })} />
+                          <Input placeholder="Phone" value={org?.phone || ""} onChange={e => updateOrg({ phone: e.target.value })} />
+                          <Input placeholder="Receipt Footer Note" value={org?.note || ""} onChange={e => updateOrg({ note: e.target.value })} />
                       </div>
                   </Section>
                   
                   <Section title="System Data" className="md:col-span-2">
                       <div className="flex flex-col md:flex-row gap-4">
-                          <Button variant="secondary" onClick={exportData} className="flex-1 py-4">Download Backup</Button>
+                          <Button variant="secondary" onClick={downloadBackupData} className="flex-1 py-4">Download Backup</Button>
                           <label className="flex-1 flex items-center justify-center px-4 py-4 border-2 border-dashed border-indigo-300 dark:border-indigo-500/30 rounded-2xl cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold transition-colors">
-                              Restore JSON <input type="file" className="hidden" onChange={importData} />
+                              Restore JSON <input type="file" className="hidden" onChange={restoreBackupData} />
                           </label>
                           <Button variant="danger" className="py-4 px-8" onClick={() => { if(confirm("ERASE ALL DATA? This cannot be undone.")) setData({ ...initialData, settings: data.settings }); }}>Factory Reset</Button>
                       </div>
@@ -1164,7 +1212,6 @@
       }
       
       function TutorialModal({ onClose }) {
-          // Included empty block for brevity, identical to original script but wrapped in standard modal.
           return (
               <div className="fixed inset-0 z-50 bg-slate-900/40 dark:bg-black/60 flex items-center justify-center p-4 backdrop-blur-md">
                   <div className="bg-white dark:bg-[#1c1c1e] w-full max-w-2xl rounded-[2rem] shadow-2xl p-8 overflow-y-auto max-h-[90vh] custom-scrollbar border border-white/20 dark:border-white/5">
